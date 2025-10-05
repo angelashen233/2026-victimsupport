@@ -1,4 +1,3 @@
-  // ...existing code...
 
 import type { Chat } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
@@ -18,25 +17,6 @@ type AppState = 'disclaimer' | 'chat' | 'report' | 'resources';
 export type AgentType = 'manager' | 'info' | 'location' | 'offtopic';
 
 const App: React.FC = () => {
-  // Handler to reset app to initial state
-  const handleStartOver = () => {
-    setAppState('disclaimer');
-    setMessages([]);
-    setReportData(null);
-    setRecipients(null);
-    setResources(null);
-    setError(null);
-    setIsGeneratingReport(false);
-    setIsWriting(false);
-    setIsGeneratingResources(false);
-    setActiveAgent('manager');
-    setUserProfile(initialUserProfile);
-    setIsMenuOpen(false);
-    setShowHospitalModal(false);
-    setIsHospitalExpanded(false);
-    setShowNearestHospital(false);
-    setShowMap(false);
-  };
   const [appState, setAppState] = useState<AppState>('disclaimer');
   const [messages, setMessages] = useState<Message[]>([]);
   const [reportData, setReportData] = useState<ReportData | null>(null);
@@ -132,25 +112,10 @@ const App: React.FC = () => {
   }, [userLocation]);
 
   // Update userLocation on initial app load
-
-  // Request user location on mount
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-          setShowNearestHospital(true);
-        },
-        (error) => {
-          setError("Could not get your location.");
-        }
-      );
-    } else {
-      setError("Geolocation is not supported by your browser.");
-    }
+    requestUserLocation();
+    // Only run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleStartChat = useCallback(() => {
@@ -281,8 +246,39 @@ const App: React.FC = () => {
   const handleBackToChat = () => {
     setAppState('chat');
   };
-  // ...existing code...
-  // ...existing code...
+
+  const handleStartOver = () => {
+    setMessages([]);
+    setReportData(null);
+    setRecipients(null);
+    setResources(null);
+    setError(null);
+    managerChatRef.current = null;
+    infoChatRef.current = null;
+    locationChatRef.current = null;
+    offTopicChatRef.current = null;
+    setIsMenuOpen(false);
+    setAppState('disclaimer');
+  };
+
+  const requestUserLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+          setShowNearestHospital(true);
+        },
+        (error) => {
+          setError("Could not get your location.");
+        }
+      );
+    } else {
+      setError("Geolocation is not supported by your browser.");
+    }
+  };
 
   // Utility: Save hospital wait times to local file
   const saveHospitalWaitTimesSnapshot = useCallback(() => {
@@ -389,103 +385,83 @@ const App: React.FC = () => {
   const [showIconInfo, setShowIconInfo] = useState(false);
   const [showImageInfo, setShowImageInfo] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
-  const AppHeader = () => {
-    if (appState === 'chat') {
-      // Move icons to left under location when chat bot is open
-      return (
-        <div style={{ position: 'fixed', top: '180px', left: '32px', zIndex: 100 }}>
-          <div className="flex flex-col gap-4">
-            <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setShowImageInfo(true)}>
-              <ResourcesIcon />
+  const AppHeader = () => (
+    <header className="absolute top-0 left-0 right-0 z-20 flex flex-col items-center p-4 md:p-6">
+        <a href="https://google.com" target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 px-4 py-2 text-sm font-medium ${darkMode ? 'text-white' : 'text-black'} transition-colors duration-200 bg-black rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-opacity-30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 focus:ring-offset-slate-900`} style={{ alignSelf: 'flex-start', background: darkMode ? undefined : '#fff', color: darkMode ? undefined : '#222' }}>
+            <span>Exit</span>
+            <ExternalLinkIcon />
+        </a>
+        <div className="flex justify-center w-full mt-2 gap-4">
+            {/* Only show ResourcesIcon for image info */}
+            <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-black bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-opacity-30`} onClick={() => setShowImageInfo(true)}>
+                <ResourcesIcon />
             </button>
-            <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setDarkMode(!darkMode)} aria-label="Toggle dark mode">
-              {darkMode ? (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v2M12 19v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 7a5 5 0 100 10 5 5 0 000-10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              ) : (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              )}
+            {/* Dark mode toggle icon */}
+            <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-black bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-opacity-30`} onClick={() => setDarkMode(!darkMode)} aria-label="Toggle dark mode">
+                {darkMode ? (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v2M12 19v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 7a5 5 0 100 10 5 5 0 000-10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                ) : (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                )}
             </button>
-          </div>
         </div>
-      );
-    }
-    // Default: top middle icons
-    return (
-      <header className="absolute top-0 left-0 right-0 z-20 flex flex-col items-center p-4 md:p-6">
-          <a href="https://google.com" target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 px-4 py-2 text-sm font-medium ${darkMode ? 'text-white' : 'text-black'} transition-colors duration-200 bg-black rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-opacity-30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 focus:ring-offset-slate-900`} style={{ alignSelf: 'flex-start', background: darkMode ? undefined : '#fff', color: darkMode ? undefined : '#222' }}>
-              <span>Exit</span>
-              <ExternalLinkIcon />
-          </a>
-          <div className="flex justify-center w-full mt-2 gap-4">
-              {/* Only show ResourcesIcon for image info */}
-        <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setShowImageInfo(true)}>
-          <ResourcesIcon />
-        </button>
-              {/* Dark mode toggle icon */}
-              <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setDarkMode(!darkMode)} aria-label="Toggle dark mode">
-                  {darkMode ? (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v2M12 19v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 7a5 5 0 100 10 5 5 0 000-10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  ) : (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  )}
-              </button>
+        {/* Popup for icon info */}
+        {showIconInfo && (
+          <div style={{
+            position: 'absolute',
+            top: '60px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#fff',
+            color: '#222',
+            padding: '1rem 2rem',
+            borderRadius: '1rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            zIndex: 1000,
+            minWidth: '260px',
+            textAlign: 'center'
+          }}>
+            <div style={{marginBottom: '0.5rem', fontWeight: 'bold'}}>Information Icon</div>
+            <div>This icon represents resources and information. Source: Custom SVG in <code>components/icons.tsx</code>.</div>
+            <button style={{marginTop: '1rem', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer'}} onClick={() => setShowIconInfo(false)}>Close</button>
           </div>
-          {/* Popup for icon info */}
-          {showIconInfo && (
-            <div style={{
-              position: 'absolute',
-              top: '60px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              background: '#fff',
-              color: '#222',
-              padding: '1rem 2rem',
-              borderRadius: '1rem',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-              zIndex: 1000,
-              minWidth: '260px',
-              textAlign: 'center'
-            }}>
-              <div style={{marginBottom: '0.5rem', fontWeight: 'bold'}}>Information Icon</div>
-              <div>This icon represents resources and information. Source: Custom SVG in <code>components/icons.tsx</code>.</div>
-              <button style={{marginTop: '1rem', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer'}} onClick={() => setShowIconInfo(false)}>Close</button>
-            </div>
-          )}
-          {/* Popup for image info */}
-          {showImageInfo && (
-            <div style={{
-              position: 'absolute',
-              top: '120px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              background: '#fff',
-              color: '#222',
-              padding: '1rem 2rem',
-              borderRadius: '1rem',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-              zIndex: 1000,
-              minWidth: '260px',
-              textAlign: 'center'
-            }}>
-              <div style={{marginBottom: '0.5rem', fontWeight: 'bold'}}>Background Image Info</div>
-              <div>Image source: <a href="https://unsplash.com/photos/green-northern-lights-xGltqb1ChYw" target="_blank" rel="noopener noreferrer">Unsplash: Green Northern Lights by Luke Stackpoole</a></div>
-              <button style={{marginTop: '1rem', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer'}} onClick={() => setShowImageInfo(false)}>Close</button>
-            </div>
-          )}
-      </header>
-    );
-  };
+        )}
+        {/* Popup for image info */}
+        {showImageInfo && (
+          <div style={{
+            position: 'absolute',
+            top: '120px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#fff',
+            color: '#222',
+            padding: '1rem 2rem',
+            borderRadius: '1rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            zIndex: 1000,
+            minWidth: '260px',
+            textAlign: 'center'
+          }}>
+            <div style={{marginBottom: '0.5rem', fontWeight: 'bold'}}>Background Image Info</div>
+            <div>Image source: <a href="https://unsplash.com/photos/green-northern-lights-xGltqb1ChYw" target="_blank" rel="noopener noreferrer">Unsplash: Green Northern Lights by Luke Stackpoole</a></div>
+            <button style={{marginTop: '1rem', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer'}} onClick={() => setShowImageInfo(false)}>Close</button>
+          </div>
+        )}
+    </header>
+  );
 
   // Set background and text color based on mode
   React.useEffect(() => {
     const body = document.body;
     if (darkMode) {
-      body.style.backgroundImage = "url('https://images.unsplash.com/photo-1508402476522-c77c2fa4479d?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D')";
+      // 4K Unsplash image for dark mode (3840px)
+      body.style.backgroundImage = "url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=3840&q=80')";
       body.style.backgroundSize = "cover";
       body.style.backgroundPosition = "center";
       body.style.color = "#e2e8f0";
     } else {
-      body.style.backgroundImage = "url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1500&q=80')";
+      // 4K Unsplash image for light mode (starry night)
+  body.style.backgroundImage = "url('https://images.unsplash.com/photo-1501594907352-04cda38ebc29?auto=format&fit=crop&w=3840&q=80')";
       body.style.backgroundSize = "cover";
       body.style.backgroundPosition = "center";
       body.style.color = "#222";
@@ -495,36 +471,14 @@ const App: React.FC = () => {
   return (
     <div className={`relative flex flex-col h-screen font-sans ${darkMode ? 'text-slate-200' : 'text-black'}`}
       style={{background: 'transparent'}}>
-      {/* Always visible exit button, top left, above hospitals */}
-      <button
-        style={{
-          position: "fixed",
-          top: "24px",
-          left: "24px",
-          zIndex: 2000,
-          background: darkMode ? "#0f172a" : "#fff",
-          color: darkMode ? "#fff" : "#222",
-          border: "none",
-          borderRadius: "8px",
-          padding: "8px 16px",
-          fontSize: "1rem",
-          fontWeight: "bold",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-          cursor: "pointer"
-        }}
-        onClick={() => window.location.href = "https://google.com"}
-        aria-label="Exit"
-      >
-        Exit
-      </button>
       {appState !== 'chat' && <AppHeader />}
       {/* Floating nearest hospital component + location identifier below */}
       {userLocation && nearestHospitals.length > 0 && (
-        <div style={{ position: "fixed", top: "80px", left: "32px", zIndex: 50, maxWidth: "350px" }}>
-          {/* Nearest hospital info styled like location identifier, less bright */}
+        <div style={{ position: "fixed", top: "30px", left: "32px", zIndex: 50, maxWidth: "350px" }}>
+          {/* Nearest hospital info styled like location identifier */}
           <div
             style={{
-              background: darkMode ? "rgba(51,65,85,0.85)" : "rgba(255,255,255,0.85)",
+              background: darkMode ? "#334155" : "#fff",
               color: darkMode ? "#fff" : "#222",
               padding: "0.75rem 1.5rem",
               borderRadius: "1rem",
@@ -567,10 +521,10 @@ const App: React.FC = () => {
               );
             })}
           </div>
-          {/* Location identifier directly below hospital info, less bright */}
+          {/* Location identifier directly below hospital info */}
           <div
             style={{
-              background: darkMode ? "rgba(51,65,85,0.85)" : "rgba(255,255,255,0.85)",
+              background: darkMode ? "#334155" : "#fff",
               color: darkMode ? "#fff" : "#222",
               padding: "0.75rem 1.5rem",
               borderRadius: "1rem",
@@ -715,7 +669,20 @@ const App: React.FC = () => {
             >
               New Session
             </div>
-            {/* Emergency Resources link removed as requested */}
+            <a
+              href="https://www.rainn.org/resources"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "block",
+                fontWeight: "bold",
+                marginBottom: "12px",
+                color: darkMode ? "#fff" : "#222",
+                textDecoration: "underline"
+              }}
+            >
+              Emergency Resources
+            </a>
           </div>
         )}
       </div>

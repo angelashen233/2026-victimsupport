@@ -1,4 +1,3 @@
-  // ...existing code...
 
 import type { Chat } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
@@ -18,25 +17,6 @@ type AppState = 'disclaimer' | 'chat' | 'report' | 'resources';
 export type AgentType = 'manager' | 'info' | 'location' | 'offtopic';
 
 const App: React.FC = () => {
-  // Handler to reset app to initial state
-  const handleStartOver = () => {
-    setAppState('disclaimer');
-    setMessages([]);
-    setReportData(null);
-    setRecipients(null);
-    setResources(null);
-    setError(null);
-    setIsGeneratingReport(false);
-    setIsWriting(false);
-    setIsGeneratingResources(false);
-    setActiveAgent('manager');
-    setUserProfile(initialUserProfile);
-    setIsMenuOpen(false);
-    setShowHospitalModal(false);
-    setIsHospitalExpanded(false);
-    setShowNearestHospital(false);
-    setShowMap(false);
-  };
   const [appState, setAppState] = useState<AppState>('disclaimer');
   const [messages, setMessages] = useState<Message[]>([]);
   const [reportData, setReportData] = useState<ReportData | null>(null);
@@ -54,7 +34,8 @@ const App: React.FC = () => {
   const [waitTimes, setWaitTimes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
-  const [showNearestHospital, setShowNearestHospital] = useState(false);
+  const [showNearestHospital, setShowNearestHospital] = useState(true);
+  const [showLocationPopup, setShowLocationPopup] = useState(true);
   const [showMap, setShowMap] = useState(false);
 
   const aiRef = useRef<GoogleGenAI | null>(null);
@@ -132,25 +113,10 @@ const App: React.FC = () => {
   }, [userLocation]);
 
   // Update userLocation on initial app load
-
-  // Request user location on mount
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-          setShowNearestHospital(true);
-        },
-        (error) => {
-          setError("Could not get your location.");
-        }
-      );
-    } else {
-      setError("Geolocation is not supported by your browser.");
-    }
+    requestUserLocation();
+    // Only run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleStartChat = useCallback(() => {
@@ -281,8 +247,39 @@ const App: React.FC = () => {
   const handleBackToChat = () => {
     setAppState('chat');
   };
-  // ...existing code...
-  // ...existing code...
+
+  const handleStartOver = () => {
+    setMessages([]);
+    setReportData(null);
+    setRecipients(null);
+    setResources(null);
+    setError(null);
+    managerChatRef.current = null;
+    infoChatRef.current = null;
+    locationChatRef.current = null;
+    offTopicChatRef.current = null;
+    setIsMenuOpen(false);
+    setAppState('disclaimer');
+  };
+
+  const requestUserLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+          setShowNearestHospital(true);
+        },
+        (error) => {
+          setError("Could not get your location.");
+        }
+      );
+    } else {
+      setError("Geolocation is not supported by your browser.");
+    }
+  };
 
   // Utility: Save hospital wait times to local file
   const saveHospitalWaitTimesSnapshot = useCallback(() => {
@@ -389,92 +386,70 @@ const App: React.FC = () => {
   const [showIconInfo, setShowIconInfo] = useState(false);
   const [showImageInfo, setShowImageInfo] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
-  const AppHeader = () => {
-    if (appState === 'chat') {
-      // Move icons to left under location when chat bot is open
-      return (
-        <div style={{ position: 'fixed', top: '180px', left: '32px', zIndex: 100 }}>
-          <div className="flex flex-col gap-4">
-            <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setShowImageInfo(true)}>
-              <ResourcesIcon />
-            </button>
+  const AppHeader = () => (
+    <header className="absolute top-0 left-0 right-0 z-20 flex flex-col items-center p-4 md:p-6">
+        <a href="https://google.com" target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 px-4 py-2 text-sm font-medium ${darkMode ? 'text-white' : 'text-black'} transition-colors duration-200 bg-black rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-opacity-30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 focus:ring-offset-slate-900`} style={{ alignSelf: 'flex-start', background: darkMode ? undefined : '#fff', color: darkMode ? undefined : '#222' }}>
+            <span>Exit</span>
+            <ExternalLinkIcon />
+        </a>
+        <div className="flex justify-center w-full mt-2 gap-4">
+            {/* Only show ResourcesIcon for image info */}
+      <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setShowImageInfo(true)}>
+        <ResourcesIcon />
+      </button>
+            {/* Dark mode toggle icon */}
             <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setDarkMode(!darkMode)} aria-label="Toggle dark mode">
-              {darkMode ? (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v2M12 19v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 7a5 5 0 100 10 5 5 0 000-10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              ) : (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              )}
+                {darkMode ? (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v2M12 19v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 7a5 5 0 100 10 5 5 0 000-10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                ) : (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                )}
             </button>
-          </div>
         </div>
-      );
-    }
-    // Default: top middle icons
-    return (
-      <header className="absolute top-0 left-0 right-0 z-20 flex flex-col items-center p-4 md:p-6">
-          <a href="https://google.com" target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 px-4 py-2 text-sm font-medium ${darkMode ? 'text-white' : 'text-black'} transition-colors duration-200 bg-black rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-opacity-30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 focus:ring-offset-slate-900`} style={{ alignSelf: 'flex-start', background: darkMode ? undefined : '#fff', color: darkMode ? undefined : '#222' }}>
-              <span>Exit</span>
-              <ExternalLinkIcon />
-          </a>
-          <div className="flex justify-center w-full mt-2 gap-4">
-              {/* Only show ResourcesIcon for image info */}
-        <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setShowImageInfo(true)}>
-          <ResourcesIcon />
-        </button>
-              {/* Dark mode toggle icon */}
-              <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setDarkMode(!darkMode)} aria-label="Toggle dark mode">
-                  {darkMode ? (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v2M12 19v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 7a5 5 0 100 10 5 5 0 000-10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  ) : (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  )}
-              </button>
+        {/* Popup for icon info */}
+        {showIconInfo && (
+          <div style={{
+            position: 'absolute',
+            top: '60px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#fff',
+            color: '#222',
+            padding: '1rem 2rem',
+            borderRadius: '1rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            zIndex: 1000,
+            minWidth: '260px',
+            textAlign: 'center'
+          }}>
+            <div style={{marginBottom: '0.5rem', fontWeight: 'bold'}}>Information Icon</div>
+            <div>This icon represents resources and information. Source: Custom SVG in <code>components/icons.tsx</code>.</div>
+            <button style={{marginTop: '1rem', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer'}} onClick={() => setShowIconInfo(false)}>Close</button>
           </div>
-          {/* Popup for icon info */}
-          {showIconInfo && (
-            <div style={{
-              position: 'absolute',
-              top: '60px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              background: '#fff',
-              color: '#222',
-              padding: '1rem 2rem',
-              borderRadius: '1rem',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-              zIndex: 1000,
-              minWidth: '260px',
-              textAlign: 'center'
-            }}>
-              <div style={{marginBottom: '0.5rem', fontWeight: 'bold'}}>Information Icon</div>
-              <div>This icon represents resources and information. Source: Custom SVG in <code>components/icons.tsx</code>.</div>
-              <button style={{marginTop: '1rem', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer'}} onClick={() => setShowIconInfo(false)}>Close</button>
-            </div>
-          )}
-          {/* Popup for image info */}
-          {showImageInfo && (
-            <div style={{
-              position: 'absolute',
-              top: '120px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              background: '#fff',
-              color: '#222',
-              padding: '1rem 2rem',
-              borderRadius: '1rem',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-              zIndex: 1000,
-              minWidth: '260px',
-              textAlign: 'center'
-            }}>
-              <div style={{marginBottom: '0.5rem', fontWeight: 'bold'}}>Background Image Info</div>
-              <div>Image source: <a href="https://unsplash.com/photos/green-northern-lights-xGltqb1ChYw" target="_blank" rel="noopener noreferrer">Unsplash: Green Northern Lights by Luke Stackpoole</a></div>
-              <button style={{marginTop: '1rem', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer'}} onClick={() => setShowImageInfo(false)}>Close</button>
-            </div>
-          )}
-      </header>
-    );
-  };
+        )}
+        {/* Popup for image info */}
+        {showImageInfo && (
+          <div style={{
+            position: 'absolute',
+            top: '120px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#fff',
+            color: '#222',
+            padding: '1rem 2rem',
+            borderRadius: '1rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            zIndex: 1000,
+            minWidth: '260px',
+            textAlign: 'center'
+          }}>
+            <div style={{marginBottom: '0.5rem', fontWeight: 'bold'}}>Background Image Info</div>
+            <div>Image source: <a href="https://unsplash.com/photos/green-northern-lights-xGltqb1ChYw" target="_blank" rel="noopener noreferrer">Unsplash: Green Northern Lights by Luke Stackpoole</a></div>
+            <button style={{marginTop: '1rem', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer'}} onClick={() => setShowImageInfo(false)}>Close</button>
+          </div>
+        )}
+    </header>
+  );
 
   // Set background and text color based on mode
   React.useEffect(() => {
@@ -495,31 +470,9 @@ const App: React.FC = () => {
   return (
     <div className={`relative flex flex-col h-screen font-sans ${darkMode ? 'text-slate-200' : 'text-black'}`}
       style={{background: 'transparent'}}>
-      {/* Always visible exit button, top left, above hospitals */}
-      <button
-        style={{
-          position: "fixed",
-          top: "24px",
-          left: "24px",
-          zIndex: 2000,
-          background: darkMode ? "#0f172a" : "#fff",
-          color: darkMode ? "#fff" : "#222",
-          border: "none",
-          borderRadius: "8px",
-          padding: "8px 16px",
-          fontSize: "1rem",
-          fontWeight: "bold",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-          cursor: "pointer"
-        }}
-        onClick={() => window.location.href = "https://google.com"}
-        aria-label="Exit"
-      >
-        Exit
-      </button>
       {appState !== 'chat' && <AppHeader />}
       {/* Floating nearest hospital component + location identifier below */}
-      {userLocation && nearestHospitals.length > 0 && (
+      {userLocation && nearestHospitals.length > 0 && showNearestHospital && (
         <div style={{ position: "fixed", top: "80px", left: "32px", zIndex: 50, maxWidth: "350px" }}>
           {/* Nearest hospital info styled like location identifier, less bright */}
           <div
@@ -531,9 +484,26 @@ const App: React.FC = () => {
               boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
               fontSize: "1rem",
               textAlign: "left",
-              marginBottom: "0.5rem"
+              marginBottom: "0.5rem",
+              position: 'relative'
             }}
           >
+            <button
+              onClick={() => setShowNearestHospital(false)}
+              style={{
+                position: 'absolute',
+                top: '8px',
+                right: '8px',
+                background: 'transparent',
+                border: 'none',
+                color: darkMode ? '#fff' : '#222',
+                fontSize: '1.2rem',
+                cursor: 'pointer'
+              }}
+              aria-label="Close nearest hospitals"
+            >
+              &#10005;
+            </button>
             <div style={{fontWeight: 'bold', marginBottom: '0.5rem'}}>Nearest Hospitals</div>
             {nearestHospitals.map((entry, idx) => {
               const waitTime = entry.hospital.waitTime?.waitTimeMinutes;
@@ -568,80 +538,114 @@ const App: React.FC = () => {
             })}
           </div>
           {/* Location identifier directly below hospital info, less bright */}
-          <div
-            style={{
-              background: darkMode ? "rgba(51,65,85,0.85)" : "rgba(255,255,255,0.85)",
-              color: darkMode ? "#fff" : "#222",
-              padding: "0.75rem 1.5rem",
-              borderRadius: "1rem",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-              fontSize: "1rem",
-              textAlign: "left",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.75rem",
-              cursor: "pointer"
-            }}
-            onClick={() => setShowMap(true)}
-          >
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '0.5rem'}}><path d="M21 10.5a8.38 8.38 0 01-1.9 5.4c-1.5 2-4.1 5.1-4.1 5.1a1.38 1.38 0 01-2 0s-2.6-3.1-4.1-5.1A8.38 8.38 0 013 10.5 7.5 7.5 0 0112 3a7.5 7.5 0 019 7.5z"></path><circle cx="12" cy="10.5" r="2.5"></circle></svg>
-            <div>
-              <div style={{fontWeight: 'bold'}}>Your Location</div>
-              <div style={{fontSize: '0.95rem'}}>Lat: {userLocation.lat}, Lng: {userLocation.lng}</div>
-              <div style={{fontSize: '0.85rem', opacity: 0.7}}>Click to expand map</div>
+          {showLocationPopup && (
+            <div
+              style={{
+                background: darkMode ? "rgba(51,65,85,0.85)" : "rgba(255,255,255,0.85)",
+                color: darkMode ? "#fff" : "#222",
+                padding: "0.75rem 1.5rem",
+                borderRadius: "1rem",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
+                fontSize: "1rem",
+                textAlign: "left",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.75rem",
+                cursor: "pointer",
+                position: 'relative'
+              }}
+              onClick={() => setShowMap(true)}
+            >
+              <button
+                onClick={e => { e.stopPropagation(); setShowLocationPopup(false); }}
+                style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '8px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: darkMode ? '#fff' : '#222',
+                  fontSize: '1.2rem',
+                  cursor: 'pointer'
+                }}
+                aria-label="Close location popup"
+              >
+                &#10005;
+              </button>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '0.5rem'}}><path d="M21 10.5a8.38 8.38 0 01-1.9 5.4c-1.5 2-4.1 5.1-4.1 5.1a1.38 1.38 0 01-2 0s-2.6-3.1-4.1-5.1A8.38 8.38 0 013 10.5 7.5 7.5 0 0112 3a7.5 7.5 0 019 7.5z"></path><circle cx="12" cy="10.5" r="2.5"></circle></svg>
+              <div>
+                <div style={{fontWeight: 'bold'}}>Your Location</div>
+                <div style={{fontSize: '0.95rem'}}>Lat: {userLocation.lat}, Lng: {userLocation.lng}</div>
+                <div style={{fontSize: '0.85rem', opacity: 0.7}}>Click to expand map</div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
-
-      {/* Expandable Google Map Modal */}
-      {userLocation && showMap && (
-        <div
-          style={{
+        {isMenuOpen && (
+          <div style={{
             position: "fixed",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: "80vw",
-            height: "60vh",
-            background: darkMode ? "#334155" : "#fff",
+            top: "58px",
+            right: "10px",
+            width: "240px",
+            background: darkMode ? "#1e293b" : "#fff",
             color: darkMode ? "#fff" : "#222",
-            zIndex: 200,
-            borderRadius: "16px",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
-            padding: "24px",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center"
-          }}
-        >
-          <button
-            onClick={() => setShowMap(false)}
-            style={{
-              alignSelf: "flex-end",
-              background: darkMode ? "#0f172a" : "#fff",
-              color: darkMode ? "#fff" : "#222",
-              border: "none",
-              borderRadius: "8px",
-              padding: "8px 12px",
-              fontSize: "1rem",
-              cursor: "pointer",
-              marginBottom: "16px"
-            }}
-          >
-            Close
-          </button>
-          <h2 style={{ marginBottom: "16px" }}>Your Location on Map</h2>
-          <iframe
-            title="Google Map"
-            width="100%"
-            height="100%"
-            style={{ border: 0, borderRadius: '12px', flex: 1 }}
-            src={`https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}&z=15&output=embed`}
-            allowFullScreen
-            loading="lazy"
-          />
-        </div>
+            borderRadius: "8px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+            padding: "12px",
+            zIndex: 101
+          }}>
+            <div
+              style={{
+                cursor: "pointer",
+                fontWeight: "bold",
+                marginBottom: "12px"
+              }}
+              onClick={() => setShowHospitalModal(true)}
+            >
+              Hospital wait time
+            </div>
+            {/* Show location in menu if popup is closed */}
+            {userLocation && !showLocationPopup && (
+              <div style={{
+                fontWeight: 'bold',
+                marginBottom: '12px',
+                fontSize: '0.95rem',
+                color: darkMode ? '#38bdf8' : '#0ea5e9',
+                textDecoration: 'underline',
+                cursor: 'pointer'
+              }}
+                onClick={() => setShowLocationPopup(true)}
+              >
+                Your Location: Lat {userLocation.lat}, Lng {userLocation.lng}
+              </div>
+            )}
+            <a
+              href="https://www.rainn.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "block",
+                fontWeight: "bold",
+                marginBottom: "12px",
+                color: darkMode ? "#fff" : "#222",
+                textDecoration: "underline"
+              }}
+            >
+              RAINN.org (Support Chat)
+            </a>
+            <div
+              style={{
+                cursor: "pointer",
+                fontWeight: "bold",
+                marginBottom: "12px"
+              }}
+              onClick={handleStartOver}
+            >
+              New Session
+            </div>
+          </div>
+        )}
       )}
       <main className="flex flex-col flex-1">
         {renderContent()}

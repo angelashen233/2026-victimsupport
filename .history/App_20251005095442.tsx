@@ -391,9 +391,17 @@ const App: React.FC = () => {
   const [darkMode, setDarkMode] = useState(true);
   const AppHeader = () => {
     if (appState === 'chat') {
-      // Move icons to left under location when chat bot is open
+      // Position icons 75px left of the chatscreen
       return (
-        <div style={{ position: 'fixed', top: '180px', left: '32px', zIndex: 100 }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: '180px',
+            left: 'calc(50% - 320px - 75px)', // ChatScreen is centered, width ~640px, so left edge is 50% - 320px, then minus 75px for offset
+            zIndex: 100,
+            transition: 'left 0.3s',
+          }}
+        >
           <div className="flex flex-col gap-4">
             <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setShowImageInfo(true)}>
               <ResourcesIcon />
@@ -517,7 +525,7 @@ const App: React.FC = () => {
       >
         Exit
       </button>
-      {appState !== 'chat' && <AppHeader />}
+  <AppHeader />
       {/* Floating nearest hospital component + location identifier below */}
       {userLocation && nearestHospitals.length > 0 && (
         <div style={{ position: "fixed", top: "80px", left: "32px", zIndex: 50, maxWidth: "350px" }}>

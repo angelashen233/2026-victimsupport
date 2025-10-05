@@ -1,4 +1,3 @@
-  // ...existing code...
 
 import type { Chat } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
@@ -18,25 +17,6 @@ type AppState = 'disclaimer' | 'chat' | 'report' | 'resources';
 export type AgentType = 'manager' | 'info' | 'location' | 'offtopic';
 
 const App: React.FC = () => {
-  // Handler to reset app to initial state
-  const handleStartOver = () => {
-    setAppState('disclaimer');
-    setMessages([]);
-    setReportData(null);
-    setRecipients(null);
-    setResources(null);
-    setError(null);
-    setIsGeneratingReport(false);
-    setIsWriting(false);
-    setIsGeneratingResources(false);
-    setActiveAgent('manager');
-    setUserProfile(initialUserProfile);
-    setIsMenuOpen(false);
-    setShowHospitalModal(false);
-    setIsHospitalExpanded(false);
-    setShowNearestHospital(false);
-    setShowMap(false);
-  };
   const [appState, setAppState] = useState<AppState>('disclaimer');
   const [messages, setMessages] = useState<Message[]>([]);
   const [reportData, setReportData] = useState<ReportData | null>(null);
@@ -132,25 +112,10 @@ const App: React.FC = () => {
   }, [userLocation]);
 
   // Update userLocation on initial app load
-
-  // Request user location on mount
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-          setShowNearestHospital(true);
-        },
-        (error) => {
-          setError("Could not get your location.");
-        }
-      );
-    } else {
-      setError("Geolocation is not supported by your browser.");
-    }
+    requestUserLocation();
+    // Only run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleStartChat = useCallback(() => {
@@ -281,8 +246,39 @@ const App: React.FC = () => {
   const handleBackToChat = () => {
     setAppState('chat');
   };
-  // ...existing code...
-  // ...existing code...
+
+  const handleStartOver = () => {
+    setMessages([]);
+    setReportData(null);
+    setRecipients(null);
+    setResources(null);
+    setError(null);
+    managerChatRef.current = null;
+    infoChatRef.current = null;
+    locationChatRef.current = null;
+    offTopicChatRef.current = null;
+    setIsMenuOpen(false);
+    setAppState('disclaimer');
+  };
+
+  const requestUserLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+          setShowNearestHospital(true);
+        },
+        (error) => {
+          setError("Could not get your location.");
+        }
+      );
+    } else {
+      setError("Geolocation is not supported by your browser.");
+    }
+  };
 
   // Utility: Save hospital wait times to local file
   const saveHospitalWaitTimesSnapshot = useCallback(() => {
@@ -391,9 +387,9 @@ const App: React.FC = () => {
   const [darkMode, setDarkMode] = useState(true);
   const AppHeader = () => {
     if (appState === 'chat') {
-      // Move icons to left under location when chat bot is open
+      // Shift icons to the right when chat bot is open
       return (
-        <div style={{ position: 'fixed', top: '180px', left: '32px', zIndex: 100 }}>
+        <div style={{ position: 'fixed', top: '180px', right: '32px', zIndex: 100 }}>
           <div className="flex flex-col gap-4">
             <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setShowImageInfo(true)}>
               <ResourcesIcon />

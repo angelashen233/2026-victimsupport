@@ -517,7 +517,7 @@ const App: React.FC = () => {
       >
         Exit
       </button>
-      {appState !== 'chat' && <AppHeader />}
+  <AppHeader />
       {/* Floating nearest hospital component + location identifier below */}
       {userLocation && nearestHospitals.length > 0 && (
         <div style={{ position: "fixed", top: "80px", left: "32px", zIndex: 50, maxWidth: "350px" }}>

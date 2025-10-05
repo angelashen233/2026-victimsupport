@@ -391,9 +391,17 @@ const App: React.FC = () => {
   const [darkMode, setDarkMode] = useState(true);
   const AppHeader = () => {
     if (appState === 'chat') {
-      // Move icons to left under location when chat bot is open
+      // Position icons 75px left of the chatscreen
       return (
-        <div style={{ position: 'fixed', top: '180px', left: '32px', zIndex: 100 }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: '180px',
+            left: 'calc(50% - 320px - 75px)',
+            zIndex: 100,
+            transition: 'left 0.3s',
+          }}
+        >
           <div className="flex flex-col gap-4">
             <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setShowImageInfo(true)}>
               <ResourcesIcon />
@@ -406,6 +414,27 @@ const App: React.FC = () => {
               )}
             </button>
           </div>
+          {/* Popup for background image info */}
+          {showImageInfo && (
+            <div style={{
+              position: 'absolute',
+              top: '60px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: '#fff',
+              color: '#222',
+              padding: '1rem 2rem',
+              borderRadius: '1rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              zIndex: 1000,
+              minWidth: '260px',
+              textAlign: 'center'
+            }}>
+              <div style={{marginBottom: '0.5rem', fontWeight: 'bold'}}>Background Image Info</div>
+              <div>Image source: <a href="https://unsplash.com/photos/green-northern-lights-xGltqb1ChYw" target="_blank" rel="noopener noreferrer">Unsplash: Green Northern Lights by Luke Stackpoole</a></div>
+              <button style={{marginTop: '1rem', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer'}} onClick={() => setShowImageInfo(false)}>Close</button>
+            </div>
+          )}
         </div>
       );
     }
@@ -517,7 +546,7 @@ const App: React.FC = () => {
       >
         Exit
       </button>
-      {appState !== 'chat' && <AppHeader />}
+  <AppHeader />
       {/* Floating nearest hospital component + location identifier below */}
       {userLocation && nearestHospitals.length > 0 && (
         <div style={{ position: "fixed", top: "80px", left: "32px", zIndex: 50, maxWidth: "350px" }}>

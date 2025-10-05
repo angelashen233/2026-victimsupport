@@ -1,23 +1,3 @@
-  // ...existing code...
-
-import type { Chat } from '@google/genai';
-import { GoogleGenAI } from '@google/genai';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import ChatScreen from './components/ChatScreen';
-import DisclaimerScreen from './components/DisclaimerScreen';
-import { ExternalLinkIcon, ResourcesIcon } from './components/icons';
-import ReportScreen from './components/ReportScreen';
-import ResourcesScreen from './components/ResourcesScreen';
-import { initialUserProfile } from './data/userProfile';
-import { createAgent, INFO_PROMPT, LOCATION_PROMPT, MANAGER_PROMPT, OFFTOPIC_PROMPT } from './services/agents';
-import { generateReport, generateResources } from './services/geminiService';
-import type { Message, Recipient, ReportData, Resource, UserProfile } from './types';
-import { MessageAuthor } from './types';
-
-type AppState = 'disclaimer' | 'chat' | 'report' | 'resources';
-export type AgentType = 'manager' | 'info' | 'location' | 'offtopic';
-
-const App: React.FC = () => {
   // Handler to reset app to initial state
   const handleStartOver = () => {
     setAppState('disclaimer');
@@ -37,6 +17,25 @@ const App: React.FC = () => {
     setShowNearestHospital(false);
     setShowMap(false);
   };
+
+import type { Chat } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import ChatScreen from './components/ChatScreen';
+import DisclaimerScreen from './components/DisclaimerScreen';
+import { ExternalLinkIcon, ResourcesIcon } from './components/icons';
+import ReportScreen from './components/ReportScreen';
+import ResourcesScreen from './components/ResourcesScreen';
+import { initialUserProfile } from './data/userProfile';
+import { createAgent, INFO_PROMPT, LOCATION_PROMPT, MANAGER_PROMPT, OFFTOPIC_PROMPT } from './services/agents';
+import { generateReport, generateResources } from './services/geminiService';
+import type { Message, Recipient, ReportData, Resource, UserProfile } from './types';
+import { MessageAuthor } from './types';
+
+type AppState = 'disclaimer' | 'chat' | 'report' | 'resources';
+export type AgentType = 'manager' | 'info' | 'location' | 'offtopic';
+
+const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>('disclaimer');
   const [messages, setMessages] = useState<Message[]>([]);
   const [reportData, setReportData] = useState<ReportData | null>(null);

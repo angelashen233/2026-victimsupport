@@ -1,4 +1,22 @@
-  // ...existing code...
+  // Handler to reset app to initial state
+  function handleStartOver() {
+    setAppState('disclaimer');
+    setMessages([]);
+    setReportData(null);
+    setRecipients(null);
+    setResources(null);
+    setError(null);
+    setIsGeneratingReport(false);
+    setIsWriting(false);
+    setIsGeneratingResources(false);
+    setActiveAgent('manager');
+    setUserProfile(initialUserProfile);
+    setIsMenuOpen(false);
+    setShowHospitalModal(false);
+    setIsHospitalExpanded(false);
+    setShowNearestHospital(false);
+    setShowMap(false);
+  }
 
 import type { Chat } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
@@ -18,25 +36,6 @@ type AppState = 'disclaimer' | 'chat' | 'report' | 'resources';
 export type AgentType = 'manager' | 'info' | 'location' | 'offtopic';
 
 const App: React.FC = () => {
-  // Handler to reset app to initial state
-  const handleStartOver = () => {
-    setAppState('disclaimer');
-    setMessages([]);
-    setReportData(null);
-    setRecipients(null);
-    setResources(null);
-    setError(null);
-    setIsGeneratingReport(false);
-    setIsWriting(false);
-    setIsGeneratingResources(false);
-    setActiveAgent('manager');
-    setUserProfile(initialUserProfile);
-    setIsMenuOpen(false);
-    setShowHospitalModal(false);
-    setIsHospitalExpanded(false);
-    setShowNearestHospital(false);
-    setShowMap(false);
-  };
   const [appState, setAppState] = useState<AppState>('disclaimer');
   const [messages, setMessages] = useState<Message[]>([]);
   const [reportData, setReportData] = useState<ReportData | null>(null);

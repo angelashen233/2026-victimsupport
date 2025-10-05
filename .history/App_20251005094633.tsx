@@ -1,4 +1,3 @@
-  // ...existing code...
 
 import type { Chat } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
@@ -18,25 +17,6 @@ type AppState = 'disclaimer' | 'chat' | 'report' | 'resources';
 export type AgentType = 'manager' | 'info' | 'location' | 'offtopic';
 
 const App: React.FC = () => {
-  // Handler to reset app to initial state
-  const handleStartOver = () => {
-    setAppState('disclaimer');
-    setMessages([]);
-    setReportData(null);
-    setRecipients(null);
-    setResources(null);
-    setError(null);
-    setIsGeneratingReport(false);
-    setIsWriting(false);
-    setIsGeneratingResources(false);
-    setActiveAgent('manager');
-    setUserProfile(initialUserProfile);
-    setIsMenuOpen(false);
-    setShowHospitalModal(false);
-    setIsHospitalExpanded(false);
-    setShowNearestHospital(false);
-    setShowMap(false);
-  };
   const [appState, setAppState] = useState<AppState>('disclaimer');
   const [messages, setMessages] = useState<Message[]>([]);
   const [reportData, setReportData] = useState<ReportData | null>(null);
@@ -132,25 +112,10 @@ const App: React.FC = () => {
   }, [userLocation]);
 
   // Update userLocation on initial app load
-
-  // Request user location on mount
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-          setShowNearestHospital(true);
-        },
-        (error) => {
-          setError("Could not get your location.");
-        }
-      );
-    } else {
-      setError("Geolocation is not supported by your browser.");
-    }
+    requestUserLocation();
+    // Only run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleStartChat = useCallback(() => {
@@ -281,8 +246,37 @@ const App: React.FC = () => {
   const handleBackToChat = () => {
     setAppState('chat');
   };
-  // ...existing code...
-  // ...existing code...
+      return (
+        <div style={{ position: 'fixed', top: '180px', left: '32px', zIndex: 100, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setShowImageInfo(true)}>
+            <ResourcesIcon />
+          </button>
+          <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setDarkMode(!darkMode)} aria-label="Toggle dark mode">
+            {darkMode ? (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v2M12 19v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 7a5 5 0 100 10 5 5 0 000-10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            ) : (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            )}
+          </button>
+        </div>
+      );
+    }
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+          setShowNearestHospital(true);
+        },
+        (error) => {
+          setError("Could not get your location.");
+        }
+      );
+    } else {
+      setError("Geolocation is not supported by your browser.");
+    }
+  };
 
   // Utility: Save hospital wait times to local file
   const saveHospitalWaitTimesSnapshot = useCallback(() => {

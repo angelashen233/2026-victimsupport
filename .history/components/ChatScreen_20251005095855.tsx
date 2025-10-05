@@ -451,6 +451,7 @@ ${VOICE_PROMPT}
                 responseModalities: [Modality.AUDIO],
                 speechConfig: {
                     voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
+                    speakingRate: 1.3, // Increase speech speed (default is 1.0)
                 },
                 systemInstruction: systemInstruction,
                 inputAudioTranscription: {},
