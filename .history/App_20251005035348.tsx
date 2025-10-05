@@ -530,6 +530,52 @@ const App: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Chat Input (always visible at the bottom) */}
+      <div
+        className="chat-input-container"
+        style={{
+          display: "flex",
+          alignItems: "center", // Vertically center items
+          padding: "0.75rem 1rem",
+          borderTop: "1px solid #334155",
+          background: "#1e293b",
+          gap: "0.5rem"
+        }}
+      >
+        <input
+          type="text"
+          value={inputValue}
+          onChange={handleInputChange}
+          style={{
+            flex: 1,
+            padding: "0.5rem 1rem",
+            borderRadius: "8px",
+            border: "1px solid #334155",
+            fontSize: "1rem",
+            background: "#0f172a",
+            color: "#fff",
+            outline: "none"
+          }}
+          placeholder="Type your message..."
+        />
+        <button
+          onClick={handleSend}
+          style={{
+            padding: "0.5rem 1rem",
+            borderRadius: "8px",
+            background: "#38bdf8",
+            color: "#fff",
+            border: "none",
+            fontWeight: "bold",
+            fontSize: "1rem",
+            cursor: "pointer",
+            marginLeft: "0.5rem"
+          }}
+        >
+          Send
+        </button>
+      </div>
     </div>
   ); 
 };

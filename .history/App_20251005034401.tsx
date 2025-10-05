@@ -175,11 +175,10 @@ const App: React.FC = () => {
     }
   };
 
-  // Find the two nearest hospitals WITH available wait times
+  // Find the two nearest hospitals
   const nearestHospitals =
     userLocation && waitTimes.length > 0
       ? [...waitTimes]
-          .filter(hospital => hospital.waitTime && hospital.waitTime.waitTimeMinutes != null)
           .map(hospital => ({
             hospital,
             dist: getDistance(
