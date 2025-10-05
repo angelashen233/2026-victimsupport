@@ -391,13 +391,13 @@ const App: React.FC = () => {
   const [darkMode, setDarkMode] = useState(true);
   const AppHeader = () => {
     // Always render icons as fixed, repositioned, and visible
-    const iconStyle: React.CSSProperties = {
+    const iconStyle = {
       position: 'fixed',
       top: appState === 'chat' ? '180px' : '32px',
       left: '32px',
       zIndex: 2000,
       display: 'flex',
-      flexDirection: (appState === 'chat' ? 'column' : 'row') as 'row' | 'column',
+      flexDirection: appState === 'chat' ? 'column' : 'row',
       gap: '16px',
       alignItems: 'center',
     };

@@ -642,13 +642,25 @@ ${VOICE_PROMPT}
   const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
   const quickReplies = lastMessage?.author === MessageAuthor.AI && lastMessage.quickReplies && lastMessage.quickReplies.length > 0 ? lastMessage.quickReplies : null;
 
-  return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto bg-slate-900/50 backdrop-blur-sm">
+    return (
+        <div
+            className="flex flex-col h-full max-w-4xl mx-auto"
+            style={{
+                background: 'rgba(30,41,59,0.85)', // dark slate with opacity
+                borderRadius: '1.5rem',
+                boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
+                border: '1.5px solid #334155',
+                backdropFilter: 'blur(8px)',
+                marginTop: '32px',
+                marginBottom: '32px',
+                overflow: 'hidden',
+            }}
+        >
       {showCamera && <CameraModal />}
       {showRecorder && <RecorderModal />}
       {showResources && <ResourcesModal />}
 
-      <div className="flex-1 p-4 overflow-y-auto space-y-6">
+    <div className="flex-1 overflow-y-auto space-y-6" style={{padding: '2rem 2.5rem 1.5rem 2.5rem'}}>
         {messages.map((msg, index) => (
           <div key={index} className={`flex items-start gap-3 ${msg.author === MessageAuthor.USER ? 'justify-end' : 'justify-start'}`}>
             {msg.author === MessageAuthor.AI && (
@@ -711,7 +723,7 @@ ${VOICE_PROMPT}
         </div>
       )}
 
-      <div className="p-4 bg-slate-800 border-t border-slate-700">
+    <div className="p-4" style={{background: 'rgba(30,41,59,0.92)', borderTop: '1.5px solid #334155'}}>
          {quickReplies && !streamingInput && !streamingOutput && (
             <div className="flex flex-wrap items-center gap-2 pb-3 mb-3 border-b border-slate-700">
                 {quickReplies.map((reply, index) => (
@@ -779,7 +791,12 @@ ${VOICE_PROMPT}
               }}
               placeholder="Type your message here..."
               rows={1}
-              className="w-full px-12 py-3 pr-28 text-base text-slate-200 transition-colors duration-200 border rounded-full resize-none bg-slate-700 border-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                                            className="w-full px-12 py-3 pr-28 text-base text-slate-200 transition-colors duration-200 border resize-none border-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                                            style={{
+                                                borderRadius: '2rem',
+                                                boxSizing: 'border-box',
+                                                background: '#0ea5e9',
+                                            }}
             />
             <div className="absolute inset-y-0 right-0 flex items-center pr-1">
                 <button
@@ -804,18 +821,16 @@ ${VOICE_PROMPT}
                                 <button
                                     onClick={handleSend}
                                     disabled={(!input.trim() && !attachedImage) || isThinking}
-                                    className="flex items-center justify-center w-12 h-12 text-white transition-colors duration-200 rounded-full bg-sky-600 border border-slate-600 hover:bg-sky-700 disabled:bg-sky-800 disabled:cursor-not-allowed"
+                                    className="flex items-center justify-center w-12 h-12 text-white transition-colors duration-200 rounded-full hover:bg-sky-700 disabled:bg-sky-800 disabled:cursor-not-allowed"
                                     style={{
                                         boxSizing: 'border-box',
-                                        marginRight: '0px',
-                                        marginBottom: '4px',
-                                        background: 'inherit',
-                                        border: '1.5px solid #334155',
+                                        borderRadius: '2rem',
+                                        background: '#0ea5e9',
+                                        border: 'none',
                                         color: '#e2e8f0',
-                                        fontSize: '1rem',
+                                        fontSize: '1.25rem',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        backgroundColor: '#0ea5e9', // matches input bar
                                     }}
                                 >
                                     <SendIcon />

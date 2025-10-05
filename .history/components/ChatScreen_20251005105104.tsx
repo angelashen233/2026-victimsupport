@@ -807,12 +807,13 @@ ${VOICE_PROMPT}
                                     className="flex items-center justify-center w-12 h-12 text-white transition-colors duration-200 rounded-full bg-sky-600 border border-slate-600 hover:bg-sky-700 disabled:bg-sky-800 disabled:cursor-not-allowed"
                                     style={{
                                         boxSizing: 'border-box',
-                                        marginRight: '0px',
+                                        marginRight: '4px',
                                         marginBottom: '4px',
+                                        padding:'0rem',
                                         background: 'inherit',
                                         border: '1.5px solid #334155',
                                         color: '#e2e8f0',
-                                        fontSize: '1rem',
+                                        fontSize: '1.25rem',
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         backgroundColor: '#0ea5e9', // matches input bar

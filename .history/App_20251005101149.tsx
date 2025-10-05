@@ -390,51 +390,91 @@ const App: React.FC = () => {
   const [showImageInfo, setShowImageInfo] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
   const AppHeader = () => {
-    // Always render icons as fixed, repositioned, and visible
-    const iconStyle: React.CSSProperties = {
-      position: 'fixed',
-      top: appState === 'chat' ? '180px' : '32px',
-      left: '32px',
-      zIndex: 2000,
-      display: 'flex',
-      flexDirection: (appState === 'chat' ? 'column' : 'row') as 'row' | 'column',
-      gap: '16px',
-      alignItems: 'center',
-    };
+    if (appState === 'chat') {
+      // Move icons to left under location when chat bot is open
+      return (
+        <div style={{ position: 'fixed', top: '180px', left: '32px', zIndex: 100 }}>
+          <div className="flex flex-col gap-4">
+            <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setShowImageInfo(true)}>
+              <ResourcesIcon />
+            </button>
+            <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setDarkMode(!darkMode)} aria-label="Toggle dark mode">
+              {darkMode ? (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v2M12 19v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 7a5 5 0 100 10 5 5 0 000-10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              ) : (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              )}
+            </button>
+          </div>
+        </div>
+      );
+    }
+    // Default: top middle icons
     return (
-      <div style={iconStyle}>
+      <header className="absolute top-0 left-0 right-0 z-20 flex flex-col items-center p-4 md:p-6">
+          <a href="https://google.com" target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 px-4 py-2 text-sm font-medium ${darkMode ? 'text-white' : 'text-black'} transition-colors duration-200 bg-black rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-opacity-30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 focus:ring-offset-slate-900`} style={{ alignSelf: 'flex-start', background: darkMode ? undefined : '#fff', color: darkMode ? undefined : '#222' }}>
+              <span>Exit</span>
+              <ExternalLinkIcon />
+          </a>
+          <div className="flex justify-center w-full mt-2 gap-4">
+              {/* Only show ResourcesIcon for image info */}
         <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setShowImageInfo(true)}>
           <ResourcesIcon />
         </button>
-        <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setDarkMode(!darkMode)} aria-label="Toggle dark mode">
-          {darkMode ? (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v2M12 19v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 7a5 5 0 100 10 5 5 0 000-10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          ) : (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          )}
-        </button>
-        {/* Popup for image info */}
-        {showImageInfo && (
-          <div style={{
-            position: 'fixed',
-            top: appState === 'chat' ? '240px' : '80px',
-            left: '32px',
-            background: '#fff',
-            color: '#222',
-            padding: '1rem 2rem',
-            borderRadius: '1rem',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            zIndex: 2100,
-            minWidth: '260px',
-            textAlign: 'center'
-          }}>
-            <div style={{marginBottom: '0.5rem', fontWeight: 'bold'}}>Background Image Info</div>
-            <div>Image source: <a href="https://unsplash.com/photos/green-northern-lights-xGltqb1ChYw" target="_blank" rel="noopener noreferrer">Unsplash: Green Northern Lights by Luke Stackpoole</a></div>
-            <button style={{marginTop: '1rem', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer'}} onClick={() => setShowImageInfo(false)}>Close</button>
+              {/* Dark mode toggle icon */}
+              <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setDarkMode(!darkMode)} aria-label="Toggle dark mode">
+                  {darkMode ? (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v2M12 19v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 7a5 5 0 100 10 5 5 0 000-10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  ) : (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  )}
+              </button>
           </div>
-        )}
-      </div>
+          {/* Popup for icon info */}
+          {showIconInfo && (
+            <div style={{
+              position: 'absolute',
+              top: '60px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: '#fff',
+              color: '#222',
+              padding: '1rem 2rem',
+              borderRadius: '1rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              zIndex: 1000,
+              minWidth: '260px',
+              textAlign: 'center'
+            }}>
+              <div style={{marginBottom: '0.5rem', fontWeight: 'bold'}}>Information Icon</div>
+              <div>This icon represents resources and information. Source: Custom SVG in <code>components/icons.tsx</code>.</div>
+              <button style={{marginTop: '1rem', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer'}} onClick={() => setShowIconInfo(false)}>Close</button>
+            </div>
+          )}
+          {/* Popup for image info */}
+          {showImageInfo && (
+            <div style={{
+              position: 'absolute',
+              top: '120px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: '#fff',
+              color: '#222',
+              padding: '1rem 2rem',
+              borderRadius: '1rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              zIndex: 1000,
+              minWidth: '260px',
+              textAlign: 'center'
+            }}>
+              <div style={{marginBottom: '0.5rem', fontWeight: 'bold'}}>Background Image Info</div>
+              <div>Image source: <a href="https://unsplash.com/photos/green-northern-lights-xGltqb1ChYw" target="_blank" rel="noopener noreferrer">Unsplash: Green Northern Lights by Luke Stackpoole</a></div>
+              <button style={{marginTop: '1rem', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer'}} onClick={() => setShowImageInfo(false)}>Close</button>
+            </div>
+          )}
+      </header>
     );
+  };
   };
 
   // Set background and text color based on mode

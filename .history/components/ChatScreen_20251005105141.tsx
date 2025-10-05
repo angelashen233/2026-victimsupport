@@ -807,7 +807,7 @@ ${VOICE_PROMPT}
                                     className="flex items-center justify-center w-12 h-12 text-white transition-colors duration-200 rounded-full bg-sky-600 border border-slate-600 hover:bg-sky-700 disabled:bg-sky-800 disabled:cursor-not-allowed"
                                     style={{
                                         boxSizing: 'border-box',
-                                        marginRight: '0px',
+                                        marginRight: '4px',
                                         marginBottom: '4px',
                                         background: 'inherit',
                                         border: '1.5px solid #334155',

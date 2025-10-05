@@ -541,7 +541,8 @@ const App: React.FC = () => {
               display: "flex",
               alignItems: "center",
               gap: "0.75rem",
-              cursor: "pointer"
+              cursor: "pointer",
+              height: "calc(100% + 5px)"
             }}
             onClick={() => setShowMap(true)}
           >
