@@ -8,7 +8,6 @@ import DisclaimerScreen from './components/DisclaimerScreen';
 import { ExternalLinkIcon, ResourcesIcon } from './components/icons';
 import ReportScreen from './components/ReportScreen';
 import ResourcesScreen from './components/ResourcesScreen';
-import WaitTimeMenu, { WaitTime } from './components/WaitTimeMenu';
 import { initialUserProfile } from './data/userProfile';
 import { createAgent, INFO_PROMPT, LOCATION_PROMPT, MANAGER_PROMPT, OFFTOPIC_PROMPT } from './services/agents';
 import { generateReport, generateResources } from './services/geminiService';
@@ -768,47 +767,6 @@ const App: React.FC = () => {
           ) : (
             <div>Location not available.</div>
           )}
-            <button
-              onClick={() => setShowHospitalModal(false)}
-              style={{
-                alignSelf: "flex-end",
-                background: darkMode ? "#0f172a" : "#fff",
-                color: darkMode ? "#fff" : "#222",
-                border: "none",
-                borderRadius: "8px",
-                padding: "8px 12px",
-                fontSize: "1rem",
-                cursor: "pointer",
-                marginBottom: "16px"
-              }}>
-              Close
-            </button>
-          <h2 style={{ marginBottom: "24px" }}>Hospital Wait Times</h2>
-          {/* Transform waitTimes to WaitTimeMenu format and add distance */}
-          <WaitTimeMenu
-            hospitals={waitTimes.map(h => {
-              // Convert waitTimeMinutes to "xh ym" format
-              let waitTimeStr = 'N/A';
-              if (h.waitTime && typeof h.waitTime.waitTimeMinutes === 'number') {
-                const mins = h.waitTime.waitTimeMinutes;
-                const hPart = Math.floor(mins / 60);
-                const mPart = mins % 60;
-                waitTimeStr = `${hPart > 0 ? hPart + 'h ' : ''}${mPart}m`;
-              }
-              return {
-                name: h.name,
-                address: h.address,
-                city: h.city || h.region || '',
-                waitTime: waitTimeStr,
-                updated: h.waitTime?.createdAt ? `Updated ${new Date(h.waitTime.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Updated just now',
-                note: h.notes || h.openStatus || h.description || '',
-                distance: userLocation ? getDistance(userLocation.lat, userLocation.lng, h.latitude, h.longitude).toFixed(2) + ' km' : undefined
-              };
-            })}
-            onGetDirections={(hospital) => {
-              window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hospital.address + ' ' + hospital.city)}`);
-            }}
-          />
         </div>
       )}
   </div>

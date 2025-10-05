@@ -8,7 +8,6 @@ import DisclaimerScreen from './components/DisclaimerScreen';
 import { ExternalLinkIcon, ResourcesIcon } from './components/icons';
 import ReportScreen from './components/ReportScreen';
 import ResourcesScreen from './components/ResourcesScreen';
-import WaitTimeMenu, { WaitTime } from './components/WaitTimeMenu';
 import { initialUserProfile } from './data/userProfile';
 import { createAgent, INFO_PROMPT, LOCATION_PROMPT, MANAGER_PROMPT, OFFTOPIC_PROMPT } from './services/agents';
 import { generateReport, generateResources } from './services/geminiService';
