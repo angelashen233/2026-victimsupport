@@ -292,15 +292,29 @@ const App: React.FC = () => {
     return R * c;
   }
 
+  // Listen for hospital mentions and respond with wait time
   useEffect(() => {
-    // Check if any message contains the word "hospital"
-    const hospitalMentioned = messages.some(
-      msg => typeof msg.text === "string" && msg.text.toLowerCase().includes("hospital")
-    );
-    if (hospitalMentioned && !showNearestHospital) {
+    if (!waitTimes || waitTimes.length === 0) return;
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg || lastMsg.author !== MessageAuthor.USER) return;
+    const text = lastMsg.text?.toLowerCase() || '';
+    // Find hospital name in message
+    const found = waitTimes.find(hospital => text.includes(hospital.name.toLowerCase()));
+    if (found) {
+      const waitTime = found.waitTime?.waitTimeMinutes;
+      setMessages(prev => [
+        ...prev,
+        {
+          author: MessageAuthor.AI,
+          text: `The current wait time for ${found.name} is ${waitTime != null ? waitTime + ' minutes' : 'not available'}.`
+        }
+      ]);
+    }
+    // Also update location if 'hospital' is mentioned
+    if (text.includes('hospital') && !showNearestHospital) {
       requestUserLocation();
     }
-  }, [messages]);
+  }, [messages, waitTimes]);
 
   // Add this useEffect to update userLocation on app load
   useEffect(() => {
