@@ -7,6 +7,7 @@ import DisclaimerScreen from './components/DisclaimerScreen';
 import { ExternalLinkIcon, ResourcesIcon } from './components/icons';
 import ReportScreen from './components/ReportScreen';
 import ResourcesScreen from './components/ResourcesScreen';
+import WaitTimeMenu, { WaitTime } from './components/WaitTimeMenu';
 import { initialUserProfile } from './data/userProfile';
 import { createAgent, INFO_PROMPT, LOCATION_PROMPT, MANAGER_PROMPT, OFFTOPIC_PROMPT } from './services/agents';
 import { generateReport, generateResources } from './services/geminiService';
@@ -573,8 +574,9 @@ const App: React.FC = () => {
             top: "50px",
             left: "50%",
             transform: "translateX(-50%)",
-            width: "80vw",
-            height: "70vh",
+            width: "90vw",
+            maxWidth: "1200px",
+            height: "80vh",
             background: "#334155",
             color: "#fff",
             zIndex: 200,
@@ -603,20 +605,31 @@ const App: React.FC = () => {
             Close
           </button>
           <h2 style={{ marginBottom: "24px" }}>Hospital Wait Times</h2>
-          {nearestHospitals.length > 0 ? (
-            nearestHospitals.map((entry, idx) => {
-              const waitTime = entry.hospital.waitTime?.waitTimeMinutes;
-              return (
-                <div key={entry.hospital.id} style={{ marginBottom: "1rem", fontSize: "1.1rem" }}>
-                  <strong>{idx === 0 ? "Nearest" : `#${idx + 1}`} Hospital: {entry.hospital.name}</strong><br />
-                  Wait Time: {waitTime ?? "N/A"} minutes<br />
-                  Distance: {entry.dist.toFixed(2)} km
-                </div>
-              );
-            })
-          ) : (
-            <div>No hospital data available.</div>
-          )}
+          {/* Transform waitTimes to WaitTimeMenu format and add distance */}
+          <WaitTimeMenu
+            hospitals={waitTimes.map(h => {
+              // Convert waitTimeMinutes to "xh ym" format
+              let waitTimeStr = 'N/A';
+              if (h.waitTime && typeof h.waitTime.waitTimeMinutes === 'number') {
+                const mins = h.waitTime.waitTimeMinutes;
+                const hPart = Math.floor(mins / 60);
+                const mPart = mins % 60;
+                waitTimeStr = `${hPart > 0 ? hPart + 'h ' : ''}${mPart}m`;
+              }
+              return {
+                name: h.name,
+                address: h.address,
+                city: h.city || h.region || '',
+                waitTime: waitTimeStr,
+                updated: h.waitTime?.createdAt ? `Updated ${new Date(h.waitTime.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Updated just now',
+                note: h.notes || h.openStatus || h.description || '',
+                distance: userLocation ? getDistance(userLocation.lat, userLocation.lng, h.latitude, h.longitude).toFixed(2) + ' km' : undefined
+              };
+            })}
+            onGetDirections={(hospital) => {
+              window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hospital.address + ' ' + hospital.city)}`);
+            }}
+          />
         </div>
       )}
     </div>
