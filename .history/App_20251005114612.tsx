@@ -399,28 +399,16 @@ const App: React.FC = () => {
   const [darkMode, setDarkMode] = useState(true);
   const AppHeader = () => {
     // Always render icons as fixed, repositioned, and visible
-    const iconStyle: React.CSSProperties = appState === 'chat'
-      ? {
-          position: 'fixed',
-          top: '70px',
-          left: 'calc(50% - 370px)', // 70px left from chat screen (assuming chat is centered)
-          zIndex: 2000,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          alignItems: 'center',
-        }
-      : {
-          position: 'fixed',
-          top: '32px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 2000,
-          display: 'flex',
-          flexDirection: 'row',
-          gap: '16px',
-          alignItems: 'center',
-        };
+    const iconStyle: React.CSSProperties = {
+      position: 'fixed',
+      top: appState === 'chat' ? '180px' : '32px',
+      left: '32px',
+      zIndex: 2000,
+      display: 'flex',
+      flexDirection: (appState === 'chat' ? 'column' : 'row') as 'row' | 'column',
+      gap: '16px',
+      alignItems: 'center',
+    };
     return (
       <div style={iconStyle}>
         <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setShowImageInfo(true)}>
@@ -438,8 +426,7 @@ const App: React.FC = () => {
           <div style={{
             position: 'fixed',
             top: appState === 'chat' ? '240px' : '80px',
-            left: '50%',
-            transform: 'translateX(-50%)',
+            left: '32px',
             background: '#fff',
             color: '#222',
             padding: '1rem 2rem',
@@ -591,50 +578,21 @@ const App: React.FC = () => {
             zIndex: 200,
             borderRadius: "16px",
             boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
-            padding: 0,
+            padding: "24px",
             display: "flex",
             flexDirection: "column",
-            alignItems: "center",
-            overflow: "hidden"
+            alignItems: "center"
           }}
         >
-          <div style={{ position: "relative", width: "100%", height: "100%" }}>
-            <button
-              onClick={() => setShowMap(false)}
-              style={{
-                position: "absolute",
-                top: 12,
-                right: 12,
-                zIndex: 10,
-                background: darkMode ? "#0f172a" : "#fff",
-                color: darkMode ? "#fff" : "#222",
-                border: "none",
-                borderRadius: "50%",
-                width: "32px",
-                height: "32px",
-                fontSize: "1.5rem",
-                fontWeight: "bold",
-                cursor: "pointer",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 0
-              }}
-              aria-label="Close map"
-            >
-              &times;
-            </button>
-            <iframe
-              title="Google Map"
-              width="100%"
-              height="100%"
-              style={{ border: 0, borderRadius: '12px', display: 'block' }}
-              src={`https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}&z=15&output=embed`}
-              allowFullScreen
-              loading="lazy"
-            />
-          </div>
+          <iframe
+            title="Google Map"
+            width="100%"
+            height="100%"
+            style={{ border: 0, borderRadius: '12px', flex: 1 }}
+            src={`https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}&z=15&output=embed`}
+            allowFullScreen
+            loading="lazy"
+          />
         </div>
       )}
       <main className="flex flex-col flex-1">

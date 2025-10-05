@@ -408,7 +408,7 @@ const App: React.FC = () => {
           display: 'flex',
           flexDirection: 'column',
           gap: '16px',
-          alignItems: 'center',
+          alignItems: 'flex-start',
         }
       : {
           position: 'fixed',
@@ -438,8 +438,7 @@ const App: React.FC = () => {
           <div style={{
             position: 'fixed',
             top: appState === 'chat' ? '240px' : '80px',
-            left: '50%',
-            transform: 'translateX(-50%)',
+            left: '32px',
             background: '#fff',
             color: '#222',
             padding: '1rem 2rem',

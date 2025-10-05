@@ -399,28 +399,16 @@ const App: React.FC = () => {
   const [darkMode, setDarkMode] = useState(true);
   const AppHeader = () => {
     // Always render icons as fixed, repositioned, and visible
-    const iconStyle: React.CSSProperties = appState === 'chat'
-      ? {
-          position: 'fixed',
-          top: '70px',
-          left: 'calc(50% - 370px)', // 70px left from chat screen (assuming chat is centered)
-          zIndex: 2000,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          alignItems: 'center',
-        }
-      : {
-          position: 'fixed',
-          top: '32px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 2000,
-          display: 'flex',
-          flexDirection: 'row',
-          gap: '16px',
-          alignItems: 'center',
-        };
+    const iconStyle: React.CSSProperties = {
+      position: 'fixed',
+      top: appState === 'chat' ? '180px' : '32px',
+      left: '32px',
+      zIndex: 2000,
+      display: 'flex',
+      flexDirection: (appState === 'chat' ? 'column' : 'row') as 'row' | 'column',
+      gap: '16px',
+      alignItems: 'center',
+    };
     return (
       <div style={iconStyle}>
         <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setShowImageInfo(true)}>
@@ -438,8 +426,7 @@ const App: React.FC = () => {
           <div style={{
             position: 'fixed',
             top: appState === 'chat' ? '240px' : '80px',
-            left: '50%',
-            transform: 'translateX(-50%)',
+            left: '32px',
             background: '#fff',
             color: '#222',
             padding: '1rem 2rem',
@@ -615,11 +602,7 @@ const App: React.FC = () => {
                 fontSize: "1.5rem",
                 fontWeight: "bold",
                 cursor: "pointer",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 0
+                boxShadow: "0 2px 8px rgba(0,0,0,0.10)"
               }}
               aria-label="Close map"
             >
