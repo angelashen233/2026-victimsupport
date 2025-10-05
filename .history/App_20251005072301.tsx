@@ -112,15 +112,7 @@ const App: React.FC = () => {
     try {
       const stored = localStorage.getItem('hospital_wait_times');
       if (stored) {
-        const rawData = JSON.parse(stored);
-        hospitalData = rawData.map(h => ({
-          name: h.name,
-          address: h.address,
-          latitude: h.latitude,
-          longitude: h.longitude,
-          waitTime: h.waitTime?.waitTimeMinutes ?? null,
-          open247: !!h.open247
-        }));
+        hospitalData = JSON.parse(stored);
       }
     } catch (e) {
       console.error('Failed to load hospital data from localStorage:', e);
@@ -128,7 +120,7 @@ const App: React.FC = () => {
     // Prepare a summary string for Gemini
     let hospitalSummary = '';
     if (hospitalData && hospitalData.length > 0) {
-      hospitalSummary = '\n---\nHOSPITAL DATA (JSON):\n' + JSON.stringify(hospitalData, null, 2) + '\n---';
+      hospitalSummary = '\n---\nHOSPITAL DATA (JSON):\n' + JSON.stringify(hospitalData.slice(0, 10), null, 2) + '\n---';
     }
     try {
       // Add hospital data to userProfile context and system prompt

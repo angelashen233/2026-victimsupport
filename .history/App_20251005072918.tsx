@@ -112,15 +112,7 @@ const App: React.FC = () => {
     try {
       const stored = localStorage.getItem('hospital_wait_times');
       if (stored) {
-        const rawData = JSON.parse(stored);
-        hospitalData = rawData.map(h => ({
-          name: h.name,
-          address: h.address,
-          latitude: h.latitude,
-          longitude: h.longitude,
-          waitTime: h.waitTime?.waitTimeMinutes ?? null,
-          open247: !!h.open247
-        }));
+        hospitalData = JSON.parse(stored);
       }
     } catch (e) {
       console.error('Failed to load hospital data from localStorage:', e);

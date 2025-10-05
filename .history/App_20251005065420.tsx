@@ -74,11 +74,6 @@ const App: React.FC = () => {
       .then((data) => {
         setWaitTimes(data);
         setLoading(false);
-        try {
-          localStorage.setItem('hospital_wait_times', JSON.stringify(data));
-        } catch (e) {
-          console.error('Failed to save hospital wait times to localStorage:', e);
-        }
       })
       .catch((error) => {
         console.error("Error fetching wait times:", error);
@@ -108,53 +103,26 @@ const App: React.FC = () => {
         setError("AI service is not initialized. Please refresh the page.");
         return;
     }
-    let hospitalData = [];
-    try {
-      const stored = localStorage.getItem('hospital_wait_times');
-      if (stored) {
-        const rawData = JSON.parse(stored);
-        hospitalData = rawData.map(h => ({
-          name: h.name,
-          address: h.address,
-          latitude: h.latitude,
-          longitude: h.longitude,
-          waitTime: h.waitTime?.waitTimeMinutes ?? null,
-          open247: !!h.open247
-        }));
-      }
-    } catch (e) {
-      console.error('Failed to load hospital data from localStorage:', e);
-    }
-    // Prepare a summary string for Gemini
-    let hospitalSummary = '';
-    if (hospitalData && hospitalData.length > 0) {
-      hospitalSummary = '\n---\nHOSPITAL DATA (JSON):\n' + JSON.stringify(hospitalData, null, 2) + '\n---';
-    }
-    try {
-      // Add hospital data to userProfile context and system prompt
-      const userProfileWithHospitals = {
-        ...userProfile,
-        hospitalData
-      };
-      const prependToPrompt = (basePrompt: string) => `${hospitalSummary}\n${basePrompt}`;
-      managerChatRef.current = createAgent(aiRef.current, prependToPrompt(MANAGER_PROMPT), userProfileWithHospitals);
-      infoChatRef.current = createAgent(aiRef.current, prependToPrompt(INFO_PROMPT), userProfileWithHospitals);
-      locationChatRef.current = createAgent(aiRef.current, prependToPrompt(LOCATION_PROMPT), userProfileWithHospitals);
-      offTopicChatRef.current = createAgent(aiRef.current, prependToPrompt(OFFTOPIC_PROMPT), userProfileWithHospitals);
+  try {
+    // Initialize all agents with user profile context
+    managerChatRef.current = createAgent(aiRef.current, MANAGER_PROMPT, userProfile);
+    infoChatRef.current = createAgent(aiRef.current, INFO_PROMPT, userProfile);
+    locationChatRef.current = createAgent(aiRef.current, LOCATION_PROMPT, userProfile);
+    offTopicChatRef.current = createAgent(aiRef.current, OFFTOPIC_PROMPT, userProfile);
 
-      setMessages([
-        {
-          author: MessageAuthor.AI,
-          text: "Hello. I'm here to listen and support you in a safe and confidential space. Please feel free to share what's on your mind when you're ready. Remember, this is not a substitute for professional help."
-        }
-      ]);
-      setActiveAgent('manager');
-      setAppState('chat');
-      setIsWriting(false);
-    } catch (e) {
-      console.error(e);
-      setError("Could not initialize the AI assistant. Please check your API key and refresh the page.");
-    }
+    setMessages([
+      {
+        author: MessageAuthor.AI,
+        text: "Hello. I'm here to listen and support you in a safe and confidential space. Please feel free to share what's on your mind when you're ready. Remember, this is not a substitute for professional help."
+      }
+    ]);
+    setActiveAgent('manager');
+    setAppState('chat');
+    setIsWriting(false);
+  } catch (e) {
+    console.error(e);
+    setError("Could not initialize the AI assistant. Please check your API key and refresh the page.");
+  }
   }, [userProfile]);
 
   const handleGenerateReport = useCallback(async () => {

@@ -112,35 +112,21 @@ const App: React.FC = () => {
     try {
       const stored = localStorage.getItem('hospital_wait_times');
       if (stored) {
-        const rawData = JSON.parse(stored);
-        hospitalData = rawData.map(h => ({
-          name: h.name,
-          address: h.address,
-          latitude: h.latitude,
-          longitude: h.longitude,
-          waitTime: h.waitTime?.waitTimeMinutes ?? null,
-          open247: !!h.open247
-        }));
+        hospitalData = JSON.parse(stored);
       }
     } catch (e) {
       console.error('Failed to load hospital data from localStorage:', e);
     }
-    // Prepare a summary string for Gemini
-    let hospitalSummary = '';
-    if (hospitalData && hospitalData.length > 0) {
-      hospitalSummary = '\n---\nHOSPITAL DATA (JSON):\n' + JSON.stringify(hospitalData, null, 2) + '\n---';
-    }
     try {
-      // Add hospital data to userProfile context and system prompt
+      // Add hospital data to userProfile context
       const userProfileWithHospitals = {
         ...userProfile,
         hospitalData
       };
-      const prependToPrompt = (basePrompt: string) => `${hospitalSummary}\n${basePrompt}`;
-      managerChatRef.current = createAgent(aiRef.current, prependToPrompt(MANAGER_PROMPT), userProfileWithHospitals);
-      infoChatRef.current = createAgent(aiRef.current, prependToPrompt(INFO_PROMPT), userProfileWithHospitals);
-      locationChatRef.current = createAgent(aiRef.current, prependToPrompt(LOCATION_PROMPT), userProfileWithHospitals);
-      offTopicChatRef.current = createAgent(aiRef.current, prependToPrompt(OFFTOPIC_PROMPT), userProfileWithHospitals);
+      managerChatRef.current = createAgent(aiRef.current, MANAGER_PROMPT, userProfileWithHospitals);
+      infoChatRef.current = createAgent(aiRef.current, INFO_PROMPT, userProfileWithHospitals);
+      locationChatRef.current = createAgent(aiRef.current, LOCATION_PROMPT, userProfileWithHospitals);
+      offTopicChatRef.current = createAgent(aiRef.current, OFFTOPIC_PROMPT, userProfileWithHospitals);
 
       setMessages([
         {

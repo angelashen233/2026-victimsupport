@@ -118,8 +118,7 @@ const App: React.FC = () => {
           address: h.address,
           latitude: h.latitude,
           longitude: h.longitude,
-          waitTime: h.waitTime?.waitTimeMinutes ?? null,
-          open247: !!h.open247
+          waitTime: h.waitTime?.waitTimeMinutes ?? null
         }));
       }
     } catch (e) {
