@@ -1,10 +1,12 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+<img width="1200" height="475" alt="GHBanner" src="https://images.pexels.com/photos/998641/pexels-photo-998641.jpeg" />
 </div>
 
-# Run and deploy your AI Studio app
+# Safe Harbor
 
-This contains everything you need to run your app locally.
+Built for StormHacks 2025
+
+By: Angela Shen, Marcus Chan, Long Nguyen, Edward Lu
 
 View your app in AI Studio: https://ai.studio/apps/drive/1pPbWFmG8YTwj7_8r0-tqlPzbJZMOyb2S
 
