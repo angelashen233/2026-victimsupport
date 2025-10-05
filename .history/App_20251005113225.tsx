@@ -583,17 +583,28 @@ const App: React.FC = () => {
             alignItems: "center"
           }}
         >
-          <iframe
-            title="Google Map"
-            width="100%"
-            height="100%"
-            style={{ border: 0, borderRadius: '12px', flex: 1 }}
-            src={`https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}&z=15&output=embed`}
-            allowFullScreen
-            loading="lazy"
-          />
-        </div>
-      )}
+        {isScreenWide && userLocation && (
+          <div
+            style={{
+              position: "fixed",
+              top: "70px", // 10px (hospital) + 30px (space) + 30px (height/padding)
+              right: "32px",
+              zIndex: 50,
+              background: "#334155",
+              color: "#fff",
+              padding: "0.5rem 1.5rem",
+              borderRadius: "0.75rem 0 0.75rem 0.75rem",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
+              fontSize: "0.95rem",
+              marginTop: "0.5rem",
+              textAlign: "right"
+            }}
+          >
+            Your Location:<br />
+            Latitude: {userLocation.lat}<br />
+            Longitude: {userLocation.lng}
+          </div>
+        )}
       <main className="flex flex-col flex-1">
         {renderContent()}
       </main>
@@ -769,7 +780,7 @@ const App: React.FC = () => {
           )}
         </div>
       )}
-  </div>
+    </div>
   );
 };
 

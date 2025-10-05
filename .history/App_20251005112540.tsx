@@ -18,9 +18,9 @@ type AppState = 'disclaimer' | 'chat' | 'report' | 'resources';
 export type AgentType = 'manager' | 'info' | 'location' | 'offtopic';
 
 const App: React.FC = () => {
-  const [isScreenWide, setIsScreenWide] = useState(window.innerWidth >= 600);
+  const [isScreenWide, setIsScreenWide] = useState(window.innerWidth >= 1304);
   useEffect(() => {
-    const handleResize = () => setIsScreenWide(window.innerWidth >= 600);
+    const handleResize = () => setIsScreenWide(window.innerWidth >= 1304);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -487,7 +487,7 @@ const App: React.FC = () => {
       </button>
       {appState !== 'chat' && <AppHeader />}
       {/* Floating nearest hospital component + location identifier below */}
-  {isScreenWide && userLocation && nearestHospitals.length > 0 && (
+      {userLocation && nearestHospitals.length > 0 && (
         <div style={{ position: "fixed", top: "80px", left: "32px", zIndex: 50, maxWidth: "350px" }}>
           {/* Nearest hospital info styled like location identifier, less bright */}
           <div
@@ -583,6 +583,23 @@ const App: React.FC = () => {
             alignItems: "center"
           }}
         >
+          <button
+            onClick={() => setShowMap(false)}
+            style={{
+              alignSelf: "flex-end",
+              background: darkMode ? "#0f172a" : "#fff",
+              color: darkMode ? "#fff" : "#222",
+              border: "none",
+              borderRadius: "8px",
+              padding: "8px 12px",
+              fontSize: "1rem",
+              cursor: "pointer",
+              marginBottom: "16px"
+            }}
+          >
+            Close
+          </button>
+          <h2 style={{ marginBottom: "16px" }}>Your Location on Map</h2>
           <iframe
             title="Google Map"
             width="100%"
@@ -684,94 +701,103 @@ const App: React.FC = () => {
       {showHospitalModal && (
         <div
           style={{
-            position: "fixed",
-            top: "50px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: "80vw",
-            height: "70vh",
-            background: darkMode ? "#334155" : "#fff",
-            color: darkMode ? "#fff" : "#222",
-            zIndex: 200,
-            borderRadius: "16px",
+            isScreenWide && (
+              <div
+                style={{
+                  position: "fixed",
+                  top: "50px",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: "80vw",
+                  height: "70vh",
+                  background: "#334155",
+                  color: "#fff",
+                  zIndex: 200,
+                  borderRadius: "16px",
+                  boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
+                  padding: "32px",
+                  overflowY: "auto",
+                  display: "flex",
+                  flexDirection: "column"
+                }}
+              >
+                <button
+                  onClick={() => setShowHospitalModal(false)}
+                  style={{
+                    alignSelf: "flex-end",
+                    background: "#0f172a",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "8px",
+                    padding: "8px 12px",
+                    fontSize: "1rem",
+                    cursor: "pointer",
+                    marginBottom: "16px"
+                  }}
+                >
+                  Close
+                </button>
+                <h2 style={{ marginBottom: "24px" }}>Hospital Wait Times</h2>
+                {Array.isArray(nearestHospitals) && nearestHospitals.length > 0 ? (
+                  nearestHospitals.map((entry, idx) => {
+                    const waitTime = entry.hospital.waitTime?.waitTimeMinutes;
+                    return (
+                      <div key={entry.hospital.id} style={{ marginBottom: "1rem", fontSize: "1.1rem" }}>
+                        <strong>{idx === 0 ? "Nearest" : `#${idx + 1}`} Hospital: {entry.hospital.name}</strong><br />
+                        Wait Time: {waitTime ?? "N/A"} minutes<br />
+                        Distance: {entry.dist.toFixed(2)} km
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div>No hospital data available.</div>
+                )}
+              </div>
+            )
             boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
-            padding: "32px",
-            overflowY: "auto",
-            display: "flex",
-            flexDirection: "column"
-          }}
-        >
-          {/* Hospital modal content should go here, e.g. hospital list rendering */}
-          {userProfile.hospitalData && userProfile.hospitalData.length > 0 ? (
-            userProfile.hospitalData.map((entry, idx) => {
-              const waitTime = entry.waitTime;
-              return (
-                <div key={entry.name} style={{ marginBottom: "1rem", fontSize: "1.1rem" }}>
-                  <strong>{idx === 0 ? "Nearest" : `#${idx + 1}`} Hospital: {entry.name}</strong><br />
-                  Wait Time: {waitTime ?? "N/A"} minutes<br />
-                  Address: {entry.address}<br />
-                  {entry.latitude && entry.longitude && (
-                    <a href={`https://www.google.com/maps/search/?api=1&query=${entry.latitude},${entry.longitude}`} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'underline' }}>Open in Google Maps</a>
-                  )}
-                  {entry.open247 && <span style={{ marginLeft: '8px', color: '#16a34a' }}>(24/7)</span>}
-                </div>
-              );
-            })
-          ) : (
-            <div>No hospital data available.</div>
-          )}
-        </div>
-      )}
-      {/* Location Modal */}
-      {showLocationModal && (
-        <div
-          style={{
-            position: "fixed",
-            top: "50px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: "400px",
-            background: darkMode ? "#334155" : "#fff",
-            color: darkMode ? "#fff" : "#222",
-            zIndex: 200,
-            borderRadius: "16px",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
-            padding: "32px",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center"
-          }}
-        >
-          <button
-            onClick={() => setShowLocationModal(false)}
-            style={{
-              alignSelf: "flex-end",
-              background: darkMode ? "#0f172a" : "#fff",
-              color: darkMode ? "#fff" : "#222",
-              border: "none",
-              borderRadius: "8px",
-              padding: "8px 12px",
-              fontSize: "1rem",
-              cursor: "pointer",
-              marginBottom: "16px"
-            }}
-          >
-            Close
-          </button>
-          <h2 style={{ marginBottom: "16px" }}>Your Location</h2>
-          {userLocation ? (
-            <div style={{ fontSize: "1.1rem", textAlign: "center" }}>
-              <div><strong>Latitude:</strong> {userLocation.lat}</div>
-              <div><strong>Longitude:</strong> {userLocation.lng}</div>
-            </div>
-          ) : (
-            <div>Location not available.</div>
-          )}
-        </div>
-      )}
-  </div>
-  );
-};
-
-
-export default App;
+            isScreenWide && (
+              <div
+                style={{
+                  position: "fixed",
+                  top: "50px",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: "400px",
+                  background: darkMode ? "#334155" : "#fff",
+                  color: darkMode ? "#fff" : "#222",
+                  zIndex: 200,
+                  borderRadius: "16px",
+                  boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
+                  padding: "32px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center"
+                }}
+              >
+                <button
+                  onClick={() => setShowLocationModal(false)}
+                  style={{
+                    alignSelf: "flex-end",
+                    background: darkMode ? "#0f172a" : "#fff",
+                    color: darkMode ? "#fff" : "#222",
+                    border: "none",
+                    borderRadius: "8px",
+                    padding: "8px 12px",
+                    fontSize: "1rem",
+                    cursor: "pointer",
+                    marginBottom: "16px"
+                  }}
+                >
+                  Close
+                </button>
+                <h2 style={{ marginBottom: "16px" }}>Your Location</h2>
+                {userLocation ? (
+                  <div style={{ fontSize: "1.1rem", textAlign: "center" }}>
+                    <div><strong>Latitude:</strong> {userLocation.lat}</div>
+                    <div><strong>Longitude:</strong> {userLocation.lng}</div>
+                  </div>
+                ) : (
+                  <div>Location not available.</div>
+                )}
+              </div>
+            )
