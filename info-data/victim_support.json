@@ -1,0 +1,93 @@
+[
+    {
+      "name": "Legal Aid BC",
+      "type": "Legal assistance",
+      "description": "Provides free legal help and information for people facing legal issues including assault, family violence, and criminal matters.",
+      "website": "https://legalaid.bc.ca/",
+      "city": "Province-wide (Vancouver HQ)",
+      "phone": "604-408-2172",
+      "address": "400-510 Burrard Street, Vancouver, BC V6C 3A8"
+    },
+    {
+      "name": "VictimLink BC",
+      "type": "24/7 Victim support line",
+      "description": "Confidential, multilingual crisis support and referral service for victims of family and sexual violence.",
+      "website": "https://www2.gov.bc.ca/gov/content/safety/public-safety/victimlinkbc",
+      "city": "Province-wide",
+      "phone": "1-800-563-0808",
+      "address": "not available"
+    },
+    {
+      "name": "Surrey Women’s Centre",
+      "type": "Crisis centre",
+      "description": "24-hour emergency response for victims of sexual assault and domestic violence in Surrey.",
+      "website": "https://surreywomenscentre.ca/",
+      "city": "Surrey",
+      "phone": "604-583-1295",
+      "address": "10075 Whalley Blvd, Surrey, BC V3T 4G1"
+    },
+    {
+      "name": "Victim Services - Vancouver Police Department",
+      "type": "Police-affiliated victim support",
+      "description": "Provides emotional support, safety planning, and court updates for crime victims in Vancouver.",
+      "website": "https://vpd.ca/services/victim-services/",
+      "city": "Vancouver",
+      "phone": "604-717-2737",
+      "address": "2120 Cambie Street, Vancouver, BC V5Z 4N6"
+    },
+    {
+      "name": "Burnaby RCMP Victim Services",
+      "type": "Police-affiliated victim support",
+      "description": "Offers assistance and referrals to victims of crime or trauma within Burnaby.",
+      "website": "https://burnaby.rcmp-grc.gc.ca/",
+      "city": "Burnaby",
+      "phone": "604-294-7922",
+      "address": "6355 Deer Lake Avenue, Burnaby, BC V5G 2J2"
+    },
+    {
+      "name": "WAVAW Rape Crisis Centre",
+      "type": "Non-profit crisis support",
+      "description": "Provides 24-hour crisis line, hospital accompaniment, and counselling for survivors of sexualized violence.",
+      "website": "https://www.wavaw.ca/",
+      "city": "Vancouver",
+      "phone": "604-255-6344 (crisis line)",
+      "address": "2405 Pine Street, Vancouver, BC V6J 5P1"
+    },
+    {
+      "name": "Battered Women’s Support Services (BWSS)",
+      "type": "Crisis support and advocacy",
+      "description": "Offers crisis line, counselling, legal advocacy, and support for women facing intimate partner violence.",
+      "website": "https://www.bwss.org/",
+      "city": "Vancouver",
+      "phone": "604-687-1867 (crisis line)",
+      "address": "110-550 Broadway West, Vancouver, BC V5Z 0E9"
+    },
+    {
+      "name": "Family Services of Greater Vancouver - Victim Services",
+      "type": "Counselling and advocacy",
+      "description": "Provides trauma-informed counselling, court support, and safety planning for victims of crime and abuse.",
+      "website": "https://fsgv.ca/programs/victimservices/",
+      "city": "Vancouver",
+      "phone": "604-874-2938",
+      "address": "1638 East Broadway, Vancouver, BC V5N 1W1"
+    },
+    {
+      "name": "MOSAIC Victim Support Services",
+      "type": "Multicultural community support",
+      "description": "Assists immigrant and refugee victims of crime, offering counselling and language-accessible support.",
+      "website": "https://www.mosaicbc.org/services/victim-support/",
+      "city": "Burnaby",
+      "phone": "604-254-9626",
+      "address": "5575 Boundary Road, Vancouver, BC V5R 2P9"
+    },
+    {
+      "name": "Options Community Services - Surrey",
+      "type": "Community agency",
+      "description": "Provides victim support, counselling, and outreach for survivors of domestic and sexual violence.",
+      "website": "https://www.options.bc.ca/",
+      "city": "Surrey",
+      "phone": "604-584-5811",
+      "address": "9815 140 Street, Surrey, BC V3T 4M4"
+    }
+  ]
+  

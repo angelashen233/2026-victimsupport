@@ -1,0 +1,123 @@
+import { GoogleGenAI, Type } from "@google/genai";
+import type { Message, ReportData, Recipient, UserProfile, Resource } from '../types';
+import { MessageAuthor } from "../types";
+
+const reportGenerationSchema = {
+    type: Type.OBJECT,
+    properties: {
+      report: {
+        type: Type.OBJECT,
+        properties: {
+          date: { type: Type.STRING, description: "Date and approximate time of the incident. If not specified, state 'Not specified'." },
+          location: { type: Type.STRING, description: "The location where the incident occurred. If not specified, state 'Not specified'." },
+          involved: { type: Type.STRING, description: "Names or descriptions of any individuals involved, including the user, alleged perpetrator(s), and witnesses. If not specified, state 'Not specified'." },
+          description: { type: Type.STRING, description: "A detailed, chronological, and objective account of the events as described by the user. Quote directly where possible for accuracy. If not enough detail is provided, state 'Not specified'." },
+          impact: { type: Type.STRING, description: "The emotional, physical, or professional impact on the individual, as described by them. If not specified, state 'Not specified'." }
+        },
+        required: ["date", "location", "involved", "description", "impact"]
+      },
+      recipients: {
+        type: Type.ARRAY,
+        description: "A list of 3-5 potential official or authoritative recipients for this report (e.g., 'Local Police Department', 'Company HR Manager', 'University Title IX Office').",
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            name: { type: Type.STRING, description: "The title or role of the potential recipient (e.g., 'Human Resources Department')." },
+            description: { type: Type.STRING, description: "A brief explanation of why this recipient might be appropriate." }
+          },
+          required: ["name", "description"]
+        }
+      }
+    },
+    required: ["report", "recipients"]
+};
+
+const resourceGenerationSchema = {
+    type: Type.OBJECT,
+    properties: {
+        resources: {
+            type: Type.ARRAY,
+            description: "A list of 3-5 relevant local and national support resources based on the conversation.",
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    name: { type: Type.STRING, description: "The name of the organization." },
+                    description: { type: Type.STRING, description: "A brief, one-sentence description of what the organization does and why it's relevant." },
+                    contact: { type: Type.STRING, description: "The primary contact information, like a website URL or a phone number." }
+                },
+                required: ["name", "description", "contact"]
+            }
+        }
+    },
+    required: ["resources"]
+};
+
+
+export const generateReport = async (ai: GoogleGenAI, messages: Message[], userProfile: UserProfile): Promise<{ report: ReportData; recipients: Recipient[] }> => {
+    const chatHistory = messages
+        .filter(m => m.author !== MessageAuthor.AI || !m.text.startsWith("Hello. I'm here to listen")) // Filter out initial greeting
+        .map(m => `${m.author === MessageAuthor.USER ? 'Person' : 'Assistant'}: ${m.text} ${m.image ? '[User provided an image]' : ''}`)
+        .join('\n');
+
+    const prompt = `
+User Profile Context:
+- Location: ${userProfile.location}
+- Gender: ${userProfile.gender}
+
+Based on the following conversation, extract the relevant details and structure them into a formal incident report. The user has given their consent to create this draft. Be objective and stick strictly to the facts provided in the conversation. If a piece of information for a field is missing from the conversation, you must state 'Not specified' for that field. Format the output as a JSON object that matches the provided schema. The report should be professional and suitable for submission to HR, legal counsel, or authorities. Also generate a list of credible or official contacts relevant to the incident's context.\n\nConversation:\n${chatHistory}`;
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+            responseMimeType: 'application/json',
+            responseSchema: reportGenerationSchema,
+            temperature: 0.1
+        }
+    });
+
+    const jsonString = response.text;
+    try {
+        const parsedJson = JSON.parse(jsonString);
+        return parsedJson;
+    } catch (e) {
+        console.error("Failed to parse JSON from Gemini:", jsonString);
+        throw new Error("The AI returned an invalid report format. Please try again.");
+    }
+};
+
+export const generateResources = async (ai: GoogleGenAI, messages: Message[], userProfile: UserProfile): Promise<{ resources: Resource[] }> => {
+    const chatHistory = messages
+        .filter(m => m.author !== MessageAuthor.AI || !m.text.startsWith("Hello. I'm here to listen"))
+        .map(m => `${m.author === MessageAuthor.USER ? 'Person' : 'Assistant'}: ${m.text}`)
+        .join('\n');
+
+    const prompt = `
+User Profile Context:
+- Location: ${userProfile.location}
+- Gender: ${userProfile.gender}
+
+Based on the following conversation, please compile a list of relevant local and national support resources for the user. These could include crisis hotlines, legal aid services, counseling centers, or shelters. Focus on resources that are most applicable to the user's situation as described in the conversation and their location. Provide 3-5 distinct resources. Format the output as a JSON object that matches the provided schema.
+
+Conversation:
+${chatHistory}`;
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+            responseMimeType: 'application/json',
+            responseSchema: resourceGenerationSchema,
+            temperature: 0.2
+        }
+    });
+
+    const jsonString = response.text;
+    try {
+        const parsedJson = JSON.parse(jsonString);
+        return parsedJson;
+    } catch (e) {
+        console.error("Failed to parse JSON from Gemini for resources:", jsonString);
+        throw new Error("The AI returned an invalid resource list format. Please try again.");
+    }
+};

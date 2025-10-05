@@ -1,0 +1,8 @@
+{
+  "name": "Copy of Copy of Safe Harbor AI - with User Profile - Long",
+  "description": "A compassionate AI assistant designed to help individuals experiencing harassment or assault by providing a safe space to chat, de-escalate distress, and generate a draft incident report with suggested recipients.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
