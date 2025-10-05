@@ -8,7 +8,6 @@ import DisclaimerScreen from './components/DisclaimerScreen';
 import { ExternalLinkIcon, ResourcesIcon } from './components/icons';
 import ReportScreen from './components/ReportScreen';
 import ResourcesScreen from './components/ResourcesScreen';
-import WaitTimeMenu, { WaitTime } from './components/WaitTimeMenu';
 import { initialUserProfile } from './data/userProfile';
 import { createAgent, INFO_PROMPT, LOCATION_PROMPT, MANAGER_PROMPT, OFFTOPIC_PROMPT } from './services/agents';
 import { generateReport, generateResources } from './services/geminiService';
@@ -392,9 +391,17 @@ const App: React.FC = () => {
   const [darkMode, setDarkMode] = useState(true);
   const AppHeader = () => {
     if (appState === 'chat') {
-      // Move icons to left under location when chat bot is open
+      // Position icons relative to chat screen, 20px off the left edge
       return (
-        <div style={{ position: 'fixed', top: '180px', left: '32px', zIndex: 100 }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: '180px',
+            left: 'calc(50% - 320px - 20px)', // ChatScreen is centered, width ~640px, so left edge is 50% - 320px, then minus 20px for offset
+            zIndex: 100,
+            transition: 'left 0.3s',
+          }}
+        >
           <div className="flex flex-col gap-4">
             <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setShowImageInfo(true)}>
               <ResourcesIcon />
@@ -518,7 +525,7 @@ const App: React.FC = () => {
       >
         Exit
       </button>
-      {appState !== 'chat' && <AppHeader />}
+  <AppHeader />
       {/* Floating nearest hospital component + location identifier below */}
       {userLocation && nearestHospitals.length > 0 && (
         <div style={{ position: "fixed", top: "80px", left: "32px", zIndex: 50, maxWidth: "350px" }}>
@@ -757,31 +764,20 @@ const App: React.FC = () => {
               Close
             </button>
           <h2 style={{ marginBottom: "24px" }}>Hospital Wait Times</h2>
-          {/* Transform waitTimes to WaitTimeMenu format and add distance */}
-          <WaitTimeMenu
-            hospitals={waitTimes.map(h => {
-              // Convert waitTimeMinutes to "xh ym" format
-              let waitTimeStr = 'N/A';
-              if (h.waitTime && typeof h.waitTime.waitTimeMinutes === 'number') {
-                const mins = h.waitTime.waitTimeMinutes;
-                const hPart = Math.floor(mins / 60);
-                const mPart = mins % 60;
-                waitTimeStr = `${hPart > 0 ? hPart + 'h ' : ''}${mPart}m`;
-              }
-              return {
-                name: h.name,
-                address: h.address,
-                city: h.city || h.region || '',
-                waitTime: waitTimeStr,
-                updated: h.waitTime?.createdAt ? `Updated ${new Date(h.waitTime.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Updated just now',
-                note: h.notes || h.openStatus || h.description || '',
-                distance: userLocation ? getDistance(userLocation.lat, userLocation.lng, h.latitude, h.longitude).toFixed(2) + ' km' : undefined
-              };
-            })}
-            onGetDirections={(hospital) => {
-              window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hospital.address + ' ' + hospital.city)}`);
-            }}
-          />
+          {nearestHospitals.length > 0 ? (
+            nearestHospitals.map((entry, idx) => {
+              const waitTime = entry.hospital.waitTime?.waitTimeMinutes;
+              return (
+                <div key={entry.hospital.id} style={{ marginBottom: "1rem", fontSize: "1.1rem" }}>
+                  <strong>{idx === 0 ? "Nearest" : `#${idx + 1}`} Hospital: {entry.hospital.name}</strong><br />
+                  Wait Time: {waitTime ?? "N/A"} minutes<br />
+                  Distance: {entry.dist.toFixed(2)} km
+                </div>
+              );
+            })
+          ) : (
+            <div>No hospital data available.</div>
+          )}
         </div>
       )}
     </div>
