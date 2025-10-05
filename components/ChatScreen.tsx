@@ -201,15 +201,17 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   const audioSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const outputSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const nextStartTimeRef = useRef<number>(0);
-  const currentInputTranscriptionRef = useRef<string>('');
-  const currentOutputTranscriptionRef = useRef<string>('');
+  const [streamingInput, setStreamingInput] = useState('');
+  const [streamingOutput, setStreamingOutput] = useState('');
+  const [micVolume, setMicVolume] = useState(0);
+  const animationFrameRef = useRef<number | null>(null);
 
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  useEffect(scrollToBottom, [messages]);
+  useEffect(scrollToBottom, [messages, streamingInput, streamingOutput]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -363,6 +365,21 @@ ${VOICE_PROMPT}
 
                     audioProcessorNodeRef.current.onaudioprocess = (audioProcessingEvent) => {
                         const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
+
+                        // Calculate volume and update UI
+                        let sum = 0.0;
+                        for (let i = 0; i < inputData.length; i++) {
+                            sum += inputData[i] * inputData[i];
+                        }
+                        const rms = Math.sqrt(sum / inputData.length);
+                        
+                        if (animationFrameRef.current === null) {
+                            animationFrameRef.current = requestAnimationFrame(() => {
+                                setMicVolume(rms);
+                                animationFrameRef.current = null;
+                            });
+                        }
+
                         const pcmBlob = createBlob(inputData);
                         liveSessionRef.current?.then((session) => {
                             session.sendRealtimeInput({ media: pcmBlob });
@@ -374,26 +391,27 @@ ${VOICE_PROMPT}
                 },
                 onmessage: async (message: LiveServerMessage) => {
                     if (message.serverContent?.outputTranscription) {
-                        currentOutputTranscriptionRef.current += message.serverContent.outputTranscription.text;
+                        setStreamingOutput(prev => prev + message.serverContent.outputTranscription.text);
                     }
                     if (message.serverContent?.inputTranscription) {
-                        currentInputTranscriptionRef.current += message.serverContent.inputTranscription.text;
+                        setStreamingInput(prev => prev + message.serverContent.inputTranscription.text);
                     }
                     if (message.serverContent?.turnComplete) {
-                        const userInput = currentInputTranscriptionRef.current.trim();
-                        const aiResponse = currentOutputTranscriptionRef.current.trim();
                         const newMessages: Message[] = [];
-                        if (userInput) {
-                            newMessages.push({ author: MessageAuthor.USER, text: userInput });
+                        const finalInput = streamingInput.trim();
+                        const finalOutput = streamingOutput.trim();
+
+                        if (finalInput) {
+                            newMessages.push({ author: MessageAuthor.USER, text: finalInput });
                         }
-                        if (aiResponse) {
-                            newMessages.push({ author: MessageAuthor.AI, text: aiResponse });
+                        if (finalOutput) {
+                            newMessages.push({ author: MessageAuthor.AI, text: finalOutput });
                         }
                         if (newMessages.length > 0) {
                             setMessages(prev => [...prev, ...newMessages]);
                         }
-                        currentInputTranscriptionRef.current = '';
-                        currentOutputTranscriptionRef.current = '';
+                        setStreamingInput('');
+                        setStreamingOutput('');
                     }
 
                     const base64EncodedAudioString = message.serverContent?.modelTurn?.parts[0]?.inlineData.data;
@@ -463,8 +481,13 @@ ${VOICE_PROMPT}
     outputSourcesRef.current.clear();
     nextStartTimeRef.current = 0;
 
-    currentInputTranscriptionRef.current = '';
-    currentOutputTranscriptionRef.current = '';
+    if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+    }
+    setMicVolume(0);
+    setStreamingInput('');
+    setStreamingOutput('');
 
     setVoiceConnectionStatus('idle');
   };
@@ -640,6 +663,26 @@ ${VOICE_PROMPT}
             )}
           </div>
         ))}
+        {streamingInput && (
+            <div className="flex items-start gap-3 justify-end">
+                <div className={`max-w-xl px-4 py-3 rounded-2xl bg-sky-600 text-white rounded-br-none`}>
+                    <div className="whitespace-pre-wrap">{streamingInput}</div>
+                </div>
+                <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-600 rounded-full text-slate-300">
+                    <UserIcon />
+                </div>
+            </div>
+        )}
+        {streamingOutput && (
+            <div className="flex items-start gap-3 justify-start">
+                <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-sky-900 rounded-full text-sky-400">
+                    <BotIcon />
+                </div>
+                <div className={`max-w-xl px-4 py-3 rounded-2xl bg-slate-700 text-slate-200 border border-slate-600 rounded-bl-none`}>
+                    <div className="whitespace-pre-wrap">{streamingOutput}</div>
+                </div>
+            </div>
+        )}
         {isThinking && (
           <div className="flex items-start gap-3 justify-start">
              <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-sky-900 rounded-full text-sky-400">
@@ -662,7 +705,7 @@ ${VOICE_PROMPT}
       )}
 
       <div className="p-4 bg-slate-800 border-t border-slate-700">
-         {quickReplies && (
+         {quickReplies && !streamingInput && !streamingOutput && (
             <div className="flex flex-wrap items-center gap-2 pb-3 mb-3 border-b border-slate-700">
                 {quickReplies.map((reply, index) => (
                     <button
@@ -738,11 +781,18 @@ ${VOICE_PROMPT}
                     title={voiceConnectionStatus === 'connected' ? 'Stop Voice Chat' : 'Start Voice Chat'}
                     className="flex items-center justify-center w-12 h-12 text-slate-400 hover:text-sky-400 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    <MicrophoneIcon className={`${
-                        voiceConnectionStatus === 'connected' ? 'text-red-500' : ''
-                    } ${
-                        voiceConnectionStatus === 'connecting' ? 'animate-pulse text-sky-500' : ''
-                    }`} />
+                    <div
+                        style={{
+                            transform: `scale(${voiceConnectionStatus === 'connected' ? 1 + micVolume * 5 : 1})`,
+                            transition: 'transform 75ms linear',
+                        }}
+                    >
+                        <MicrophoneIcon className={`${
+                            voiceConnectionStatus === 'connected' ? 'text-red-500' : ''
+                        } ${
+                            voiceConnectionStatus === 'connecting' ? 'animate-pulse text-sky-500' : ''
+                        }`} />
+                    </div>
                 </button>
                 <button
                 onClick={handleSend}
