@@ -81,16 +81,6 @@ const App: React.FC = () => {
       });
   }, []);
 
-  // Sync userProfile.location with userLocation
-  useEffect(() => {
-    if (userLocation) {
-      setUserProfile(prev => ({
-        ...prev,
-        location: `Lat: ${userLocation.lat}, Lng: ${userLocation.lng}`
-      }));
-    }
-  }, [userLocation]);
-
   // Update userLocation on initial app load
   useEffect(() => {
     requestUserLocation();

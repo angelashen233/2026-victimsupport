@@ -81,7 +81,7 @@ const App: React.FC = () => {
       });
   }, []);
 
-  // Sync userProfile.location with userLocation
+    // Sync userProfile.location with userLocation
   useEffect(() => {
     if (userLocation) {
       setUserProfile(prev => ({

@@ -1,4 +1,3 @@
-
 import type { Chat } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -24,7 +23,6 @@ const App: React.FC = () => {
   const [resources, setResources] = useState<Resource[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-  const [isWriting, setIsWriting] = useState(false);
   const [isGeneratingResources, setIsGeneratingResources] = useState(false);
   const [activeAgent, setActiveAgent] = useState<AgentType>('manager');
   const [userProfile, setUserProfile] = useState<UserProfile>(initialUserProfile);
@@ -81,48 +79,30 @@ const App: React.FC = () => {
       });
   }, []);
 
-  // Sync userProfile.location with userLocation
-  useEffect(() => {
-    if (userLocation) {
-      setUserProfile(prev => ({
-        ...prev,
-        location: `Lat: ${userLocation.lat}, Lng: ${userLocation.lng}`
-      }));
-    }
-  }, [userLocation]);
-
-  // Update userLocation on initial app load
-  useEffect(() => {
-    requestUserLocation();
-    // Only run once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const handleStartChat = useCallback(() => {
     if (!aiRef.current) {
         setError("AI service is not initialized. Please refresh the page.");
         return;
     }
-  try {
-    // Initialize all agents with user profile context
-    managerChatRef.current = createAgent(aiRef.current, MANAGER_PROMPT, userProfile);
-    infoChatRef.current = createAgent(aiRef.current, INFO_PROMPT, userProfile);
-    locationChatRef.current = createAgent(aiRef.current, LOCATION_PROMPT, userProfile);
-    offTopicChatRef.current = createAgent(aiRef.current, OFFTOPIC_PROMPT, userProfile);
+    try {
+        // Initialize all agents with user profile context
+        managerChatRef.current = createAgent(aiRef.current, MANAGER_PROMPT, userProfile);
+        infoChatRef.current = createAgent(aiRef.current, INFO_PROMPT, userProfile);
+        locationChatRef.current = createAgent(aiRef.current, LOCATION_PROMPT, userProfile);
+        offTopicChatRef.current = createAgent(aiRef.current, OFFTOPIC_PROMPT, userProfile);
 
-    setMessages([
-      {
-        author: MessageAuthor.AI,
-        text: "Hello. I'm here to listen and support you in a safe and confidential space. Please feel free to share what's on your mind when you're ready. Remember, this is not a substitute for professional help."
-      }
-    ]);
-    setActiveAgent('manager');
-    setAppState('chat');
-    setIsWriting(false);
-  } catch (e) {
-    console.error(e);
-    setError("Could not initialize the AI assistant. Please check your API key and refresh the page.");
-  }
+        setMessages([
+            {
+                author: MessageAuthor.AI,
+                text: "Hello. I'm here to listen and support you in a safe and confidential space. Please feel free to share what's on your mind when you're ready. Remember, this is not a substitute for professional help."
+            }
+        ]);
+        setActiveAgent('manager');
+        setAppState('chat');
+    } catch (e) {
+        console.error(e);
+        setError("Could not initialize the AI assistant. Please check your API key and refresh the page.");
+    }
   }, [userProfile]);
 
   const handleGenerateReport = useCallback(async () => {
@@ -240,8 +220,6 @@ const App: React.FC = () => {
             isGeneratingResources={isGeneratingResources}
             error={error}
             setError={setError}
-            isWriting={isWriting}
-            setIsWriting={setIsWriting}
           />
         );
       case 'report':

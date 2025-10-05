@@ -1,4 +1,3 @@
-
 import type { Chat } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -17,6 +16,8 @@ type AppState = 'disclaimer' | 'chat' | 'report' | 'resources';
 export type AgentType = 'manager' | 'info' | 'location' | 'offtopic';
 
 const App: React.FC = () => {
+  // Non-intrusive disclaimer popup state
+  const [showDisclaimerPopup, setShowDisclaimerPopup] = useState(false);
   const [appState, setAppState] = useState<AppState>('disclaimer');
   const [messages, setMessages] = useState<Message[]>([]);
   const [reportData, setReportData] = useState<ReportData | null>(null);
@@ -24,7 +25,6 @@ const App: React.FC = () => {
   const [resources, setResources] = useState<Resource[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-  const [isWriting, setIsWriting] = useState(false);
   const [isGeneratingResources, setIsGeneratingResources] = useState(false);
   const [activeAgent, setActiveAgent] = useState<AgentType>('manager');
   const [userProfile, setUserProfile] = useState<UserProfile>(initialUserProfile);
@@ -81,48 +81,30 @@ const App: React.FC = () => {
       });
   }, []);
 
-  // Sync userProfile.location with userLocation
-  useEffect(() => {
-    if (userLocation) {
-      setUserProfile(prev => ({
-        ...prev,
-        location: `Lat: ${userLocation.lat}, Lng: ${userLocation.lng}`
-      }));
-    }
-  }, [userLocation]);
-
-  // Update userLocation on initial app load
-  useEffect(() => {
-    requestUserLocation();
-    // Only run once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const handleStartChat = useCallback(() => {
     if (!aiRef.current) {
         setError("AI service is not initialized. Please refresh the page.");
         return;
     }
-  try {
-    // Initialize all agents with user profile context
-    managerChatRef.current = createAgent(aiRef.current, MANAGER_PROMPT, userProfile);
-    infoChatRef.current = createAgent(aiRef.current, INFO_PROMPT, userProfile);
-    locationChatRef.current = createAgent(aiRef.current, LOCATION_PROMPT, userProfile);
-    offTopicChatRef.current = createAgent(aiRef.current, OFFTOPIC_PROMPT, userProfile);
+    try {
+        // Initialize all agents with user profile context
+        managerChatRef.current = createAgent(aiRef.current, MANAGER_PROMPT, userProfile);
+        infoChatRef.current = createAgent(aiRef.current, INFO_PROMPT, userProfile);
+        locationChatRef.current = createAgent(aiRef.current, LOCATION_PROMPT, userProfile);
+        offTopicChatRef.current = createAgent(aiRef.current, OFFTOPIC_PROMPT, userProfile);
 
-    setMessages([
-      {
-        author: MessageAuthor.AI,
-        text: "Hello. I'm here to listen and support you in a safe and confidential space. Please feel free to share what's on your mind when you're ready. Remember, this is not a substitute for professional help."
-      }
-    ]);
-    setActiveAgent('manager');
-    setAppState('chat');
-    setIsWriting(false);
-  } catch (e) {
-    console.error(e);
-    setError("Could not initialize the AI assistant. Please check your API key and refresh the page.");
-  }
+        setMessages([
+            {
+                author: MessageAuthor.AI,
+                text: "Hello. I'm here to listen and support you in a safe and confidential space. Please feel free to share what's on your mind when you're ready. Remember, this is not a substitute for professional help."
+            }
+        ]);
+        setActiveAgent('manager');
+        setAppState('chat');
+    } catch (e) {
+        console.error(e);
+        setError("Could not initialize the AI assistant. Please check your API key and refresh the page.");
+    }
   }, [userProfile]);
 
   const handleGenerateReport = useCallback(async () => {
@@ -218,7 +200,30 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (appState) {
       case 'disclaimer':
-        return <DisclaimerScreen onAccept={handleStartChat} />;
+        return (
+          <>
+            <DisclaimerScreen onAccept={handleStartChat} />
+            <button
+              style={{
+                margin: '24px 0',
+                padding: '12px 24px',
+                borderRadius: '8px',
+                background: '#38bdf8',
+                color: '#fff',
+                fontWeight: 'bold',
+                fontSize: '1.1rem',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'block',
+                marginLeft: 'auto',
+                marginRight: 'auto'
+              }}
+              onClick={() => setShowDisclaimerPopup(true)}
+            >
+              Unsure if your experience was abusive or an assault?
+            </button>
+          </>
+        );
       case 'chat':
         return (
           <ChatScreen
@@ -240,8 +245,6 @@ const App: React.FC = () => {
             isGeneratingResources={isGeneratingResources}
             error={error}
             setError={setError}
-            isWriting={isWriting}
-            setIsWriting={setIsWriting}
           />
         );
       case 'report':
@@ -267,45 +270,19 @@ const App: React.FC = () => {
   };
 
   const AppHeader = () => (
-    <header className="absolute top-0 left-0 right-0 z-20 flex flex-col items-center p-4 md:p-6">
-        <a href="https://google.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 bg-black rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-opacity-30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 focus:ring-offset-slate-900" style={{ alignSelf: 'flex-start' }}>
+    <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 md:p-6">
+        <a href="https://google.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 bg-black rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-opacity-30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 focus:ring-offset-slate-900">
             <span>Exit</span>
             <ExternalLinkIcon />
         </a>
-        <div className="flex justify-center w-full mt-2">
+        
+        <div className="flex items-center gap-2">
             <button className="flex items-center justify-center w-10 h-10 text-white transition-colors duration-200 bg-black rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-opacity-30">
                 <ResourcesIcon />
             </button>
-        </div>
-    </header>
-  );
-
-  function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-    const R = 6371; // km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * Math.PI / 180) *
-      Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  }
-
-  useEffect(() => {
-    // Check if any message contains the word "hospital"
-    const hospitalMentioned = messages.some(
-      msg => typeof msg.text === "string" && msg.text.toLowerCase().includes("hospital")
-    );
-    if (hospitalMentioned && !showNearestHospital) {
-      requestUserLocation();
-    }
-  }, [messages]);
-
-  if (loading) return <div>Loading...</div>;
-
+            {/* Right-side menu example */}
+{/* 
+<div className="relative" ref={menuRef}>
   return (
     <div className="relative flex flex-col h-screen font-sans text-slate-200">
       {appState !== 'chat' && <AppHeader />}
@@ -363,103 +340,89 @@ const App: React.FC = () => {
       )}
       <main className="flex flex-col flex-1">
         {renderContent()}
-        {/* 
-        <div>
-          <h1>Emergency Department Wait Times</h1>
-          <ul>
-            {waitTimes.map((item, idx) => (
-              <li key={idx}>
-                {item.name}: {item.waitTime?.waitTimeMinutes ?? "N/A"} minutes
-              </li>
-            ))}
-          </ul>
-        </div>
-        */}
       </main>
-      {/* <button onClick={requestUserLocation}>Show Nearest Hospital</button> */}
 
-      {/* Hamburger Menu (moved to top right) */}
-      <div style={{
-        position: "fixed",
-        top: "10px",
-        right: "10px",
-        zIndex: 100
-      }}>
-        <button
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
+      {/* Hamburger Menu (fixed top right, never moves) */}
+      <button
+        onClick={() => setIsMenuOpen(!isMenuOpen)}
+        style={{
+          position: "fixed",
+          top: "10px",
+          right: "10px",
+          background: "#0f172a",
+          color: "#fff",
+          border: "none",
+          borderRadius: "8px",
+          padding: "8px 12px",
+          fontSize: "1.5rem",
+          cursor: "pointer",
+          zIndex: 101
+        }}
+        aria-label="Open menu"
+      >
+        ☰
+      </button>
+      {isMenuOpen && (
+        <div
           style={{
-            background: "#0f172a",
-            color: "#fff",
-            border: "none",
-            borderRadius: "8px",
-            padding: "8px 12px",
-            fontSize: "1.5rem",
-            cursor: "pointer"
-          }}
-          aria-label="Open menu"
-        >
-          ☰
-        </button>
-        {isMenuOpen && (
-          <div style={{
             position: "fixed",
             top: "58px",
             right: "10px",
-            width: "240px",
             background: "#1e293b",
             color: "#fff",
             borderRadius: "8px",
+            minWidth: "220px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
             padding: "12px",
-            zIndex: 101
-          }}>
-            <div
-              style={{
-                cursor: "pointer",
-                fontWeight: "bold",
-                marginBottom: "12px"
-              }}
-              onClick={() => setShowHospitalModal(true)}
-            >
-              Hospital wait time
-            </div>
-            <div
-              style={{
-                cursor: "pointer",
-                fontWeight: "bold",
-                marginBottom: "12px"
-              }}
-              onClick={() => {/* handle HUMAN CHAT navigation here */}}
-            >
-              HUMAN CHAT
-            </div>
-            <div
-              style={{
-                cursor: "pointer",
-                fontWeight: "bold",
-                marginBottom: "12px"
-              }}
-              onClick={handleStartOver}
-            >
-              New Session
-            </div>
-            <a
-              href="https://www.rainn.org/resources"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: "block",
-                fontWeight: "bold",
-                marginBottom: "12px",
-                color: "#fff",
-                textDecoration: "underline"
-              }}
-            >
-              Emergency Resources
-            </a>
+            zIndex: 100
+          }}
+        >
+          <div
+            style={{
+              cursor: "pointer",
+              fontWeight: "bold",
+              marginBottom: "12px"
+            }}
+            onClick={() => setShowHospitalModal(true)}
+          >
+            Hospital wait time
           </div>
-        )}
-      </div>
+          <div
+            style={{
+              cursor: "pointer",
+              fontWeight: "bold",
+              marginBottom: "12px"
+            }}
+            onClick={() => {/* handle HUMAN CHAT navigation here */}}
+          >
+            HUMAN CHAT
+          </div>
+          <div
+            style={{
+              cursor: "pointer",
+              fontWeight: "bold",
+              marginBottom: "12px"
+            }}
+            onClick={handleStartOver}
+          >
+            New Session
+          </div>
+          <a
+            href="https://www.rainn.org/resources"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "block",
+              fontWeight: "bold",
+              marginBottom: "12px",
+              color: "#fff",
+              textDecoration: "underline"
+            }}
+          >
+            Emergency Resources
+          </a>
+        </div>
+      )}
 
       {/* Large Hospital Wait-Time Modal */}
       {showHospitalModal && (
@@ -474,6 +437,103 @@ const App: React.FC = () => {
             background: "#334155",
             color: "#fff",
             zIndex: 200,
+            borderRadius: "16px",
+            boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
+            padding: "32px",
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column"
+          }}
+        >
+          <button
+            onClick={() => setShowHospitalModal(false)}
+            style={{
+              alignSelf: "flex-end",
+              background: "#0f172a",
+              color: "#fff",
+              border: "none",
+              borderRadius: "8px",
+              padding: "8px 12px",
+              fontSize: "1rem",
+              cursor: "pointer",
+              marginBottom: "16px"
+            }}
+          >
+            Close
+          </button>
+          <h2 style={{ marginBottom: "24px" }}>Hospital Wait Times</h2>
+          {nearestHospitals.length > 0 ? (
+            nearestHospitals.map((entry, idx) => {
+              const waitTime = entry.hospital.waitTime?.waitTimeMinutes;
+              return (
+                <div key={entry.hospital.id} style={{ marginBottom: "1rem", fontSize: "1.1rem" }}>
+                  <strong>{idx === 0 ? "Nearest" : `#${idx + 1}`} Hospital: {entry.hospital.name}</strong><br />
+                  Wait Time: {waitTime ?? "N/A"} minutes<br />
+                  Distance: {entry.dist.toFixed(2)} km
+                </div>
+              );
+            })
+          ) : (
+            <div>No hospital data available.</div>
+          )}
+        </div>
+      )}
+
+      {/* Non-intrusive Disclaimer Popup */}
+      {showDisclaimerPopup && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(30,41,59,0.85)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              color: '#1e293b',
+              borderRadius: '16px',
+              padding: '32px',
+              maxWidth: '480px',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.25)',
+              textAlign: 'center'
+            }}
+          >
+            <h2 style={{ marginBottom: '16px' }}>Disclaimer</h2>
+            <div style={{ marginBottom: '24px', textAlign: 'left' }}>
+              <strong>I am not a human assistant.</strong> <strong>I cannot provide emotional, legal, or medical advice.</strong> SFU has a SAP app with a human assistant. If that’s what you prefer, go to the top bar option for the RAIN sexual assault 24-hour support line.<br /><br />
+              My purpose is solely to assist with documentation based on what you share.<br /><br />
+              If you are in immediate danger, please contact your local emergency services (e.g., call 911).<br /><br />
+              Your privacy is important. Conversations are processed to provide the service but are not stored long-term or used to identify you. Please avoid sharing sensitive personal identification details.<br /><br />
+              We can summarize any information you would like to save as notes for your own reference if speaking to a police officer.
+            </div>
+            <button
+              style={{
+                padding: '10px 24px',
+                borderRadius: '8px',
+                background: '#38bdf8',
+                color: '#fff',
+                fontWeight: 'bold',
+                fontSize: '1rem',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+              onClick={() => setShowDisclaimerPopup(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
             borderRadius: "16px",
             boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
             padding: "32px",

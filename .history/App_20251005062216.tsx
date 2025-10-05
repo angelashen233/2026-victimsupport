@@ -1,4 +1,4 @@
-
+  // ...existing code...
 import type { Chat } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -80,16 +80,6 @@ const App: React.FC = () => {
         setLoading(false);
       });
   }, []);
-
-  // Sync userProfile.location with userLocation
-  useEffect(() => {
-    if (userLocation) {
-      setUserProfile(prev => ({
-        ...prev,
-        location: `Lat: ${userLocation.lat}, Lng: ${userLocation.lng}`
-      }));
-    }
-  }, [userLocation]);
 
   // Update userLocation on initial app load
   useEffect(() => {
