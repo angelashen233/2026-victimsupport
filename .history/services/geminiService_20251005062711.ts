@@ -103,16 +103,6 @@ export const generateResources = async (ai: GoogleGenAI, messages: Message[], us
         name: "Salal Sexual Violence Support Centre (SVSC)",
         description: "Provides support, advocacy, and counseling for survivors of sexual violence in Greater Vancouver.",
         contact: "https://www.salalsvsc.ca/"
-      },
-      {
-        name: "Ending Violence BC Services Directory",
-        description: "Comprehensive directory of anti-violence services and support organizations in British Columbia.",
-        contact: "https://endingviolence.org/services-directory/"
-      },
-      {
-        name: "Ending Violence Canada Sexual Assault Centres & Crisis Lines",
-        description: "National directory of sexual assault centres, crisis lines, and support services across Canada.",
-        contact: "https://endingviolencecanada.org/sexual-assault-centres-crisis-lines-and-support-services/"
       }
     ];
 
