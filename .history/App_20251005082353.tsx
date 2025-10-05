@@ -148,7 +148,7 @@ const App: React.FC = () => {
     // Victim support resource filtering
     let victimResources = [];
     try {
-      const stored = localStorage.getItem('victim_support_resources');
+      const stored = localStorage.getItem('victim_support');
       if (stored) {
         const rawResources = JSON.parse(stored);
         // Filter by type/description match and nearest location
