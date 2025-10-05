@@ -1,4 +1,3 @@
-
 import type { Chat } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -79,23 +78,6 @@ const App: React.FC = () => {
         console.error("Error fetching wait times:", error);
         setLoading(false);
       });
-  }, []);
-
-  // Sync userProfile.location with userLocation
-  useEffect(() => {
-    if (userLocation) {
-      setUserProfile(prev => ({
-        ...prev,
-        location: `Lat: ${userLocation.lat}, Lng: ${userLocation.lng}`
-      }));
-    }
-  }, [userLocation]);
-
-  // Update userLocation on initial app load
-  useEffect(() => {
-    requestUserLocation();
-    // Only run once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleStartChat = useCallback(() => {
