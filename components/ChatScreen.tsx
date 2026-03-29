@@ -5,7 +5,7 @@ import { MessageAuthor } from '../types';
 // FIX: Removed 'LiveSession' which is not an exported member, and aliased 'Blob' to 'GenAIBlob' to avoid conflict with the native DOM Blob type.
 import type { Chat, Part, LiveServerMessage, Blob as GenAIBlob, GoogleGenAI } from '@google/genai';
 import { Modality } from '@google/genai';
-import { GenerateReportIcon, SendIcon, UserIcon, BotIcon, AttachmentIcon, CameraIcon, AudioIcon, ResourcesIcon, MoreVertIcon, MicrophoneIcon } from './icons';
+import { GenerateReportIcon, SendIcon, UserIcon, BotIcon, AttachmentIcon, CameraIcon, AudioIcon, ResourcesIcon, MoreVertIcon, MicrophoneIcon, DownloadIcon } from './icons';
 import type { AgentType } from '../App';
 import { VOICE_PROMPT } from '../services/agents';
 
@@ -83,6 +83,8 @@ interface ChatScreenProps {
     setError: React.Dispatch<React.SetStateAction<string | null>>;
     isWriting: boolean;
     setIsWriting: React.Dispatch<React.SetStateAction<boolean>>;
+    initialPrompt?: string | null;
+    onInitialPromptSent?: () => void;
 }
 
 // Helper for formatting standard text (bold, links)
@@ -172,12 +174,34 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     error,
     setError,
     isWriting,
-    setIsWriting
+    setIsWriting,
+    initialPrompt,
+    onInitialPromptSent,
 }) => {
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [quickRepliesExpanded, setQuickRepliesExpanded] = useState(false);
+
+  const handleDownloadConversation = () => {
+    const now = new Date();
+    const header = `Safe Harbor Conversation\nExported: ${now.toLocaleString()}\n${'─'.repeat(40)}\n\n`;
+    const text = header + messages
+      .map(m => {
+        const speaker = m.author === MessageAuthor.USER ? 'You' : 'Safe Harbor';
+        const ts = m.timestamp ? ` [${m.timestamp}]` : '';
+        return `${speaker}${ts}:\n${m.text}`;
+      })
+      .join('\n\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `conversation-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
   const [showCamera, setShowCamera] = useState(false);
   const [showRecorder, setShowRecorder] = useState(false);
   const [showResources, setShowResources] = useState(false);
@@ -307,7 +331,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
             }
         }
         
-        const aiMessage: Message = { author: MessageAuthor.AI, text: cleanText, quickReplies };
+        const aiMessage: Message = { author: MessageAuthor.AI, text: cleanText, quickReplies, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
         setMessages(prev => [...prev, aiMessage]);
     } catch (e) {
         console.error(e);
@@ -318,10 +342,22 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     }
   }, [activeAgent, chats, setActiveAgent, setError, setMessages]);
 
+  // Auto-send a prompt that was selected on the disclaimer screen
+  const autoSentRef = useRef(false);
+  useEffect(() => {
+    if (initialPrompt && chats.manager && !autoSentRef.current) {
+      autoSentRef.current = true;
+      const userMessage: Message = { author: MessageAuthor.USER, text: initialPrompt, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+      setMessages(prev => [...prev, userMessage]);
+      sendMessageToAI(userMessage);
+      onInitialPromptSent?.();
+    }
+  }, [initialPrompt, chats.manager]);
+
 
   const handleSend = async () => {
     if ((!input.trim() && !attachedImage) || isThinking) return;
-    const userMessage: Message = { author: MessageAuthor.USER, text: input, image: attachedImage };
+    const userMessage: Message = { author: MessageAuthor.USER, text: input, image: attachedImage, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setAttachedImage(null);
@@ -330,7 +366,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   
   const handleQuickReplyClick = async (replyText: string) => {
       if (isThinking) return;
-      const userMessage: Message = { author: MessageAuthor.USER, text: replyText };
+      const userMessage: Message = { author: MessageAuthor.USER, text: replyText, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
       setMessages(prev => [...prev, userMessage]);
       await sendMessageToAI(userMessage);
   };
@@ -443,7 +479,7 @@ ${VOICE_PROMPT}
                     setVoiceConnectionStatus('error');
                     stopVoiceChat();
                 },
-                onclose: (e: CloseEvent) => {
+                onclose: (_e: CloseEvent) => {
                     stopVoiceChat();
                 },
             },
@@ -643,7 +679,7 @@ ${VOICE_PROMPT}
   const quickReplies = lastMessage?.author === MessageAuthor.AI && lastMessage.quickReplies && lastMessage.quickReplies.length > 0 ? lastMessage.quickReplies : null;
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto bg-slate-900/50 backdrop-blur-sm">
+    <div className="flex flex-col h-full max-w-3xl mx-auto bg-slate-900/60 backdrop-blur-sm w-full">
       {showCamera && <CameraModal />}
       {showRecorder && <RecorderModal />}
       {showResources && <ResourcesModal />}
@@ -710,19 +746,30 @@ ${VOICE_PROMPT}
         </div>
       )}
 
-      <div className="p-4 bg-slate-800 border-t border-slate-700">
+      <div className="px-4 pt-3 pb-4 bg-slate-800/90 border-t border-slate-700/70 backdrop-blur-sm">
          {quickReplies && !streamingInput && !streamingOutput && (
-            <div className="flex flex-wrap items-center gap-2 pb-3 mb-3 border-b border-slate-700">
-                {quickReplies.map((reply, index) => (
-                    <button
-                        key={index}
-                        onClick={() => handleQuickReplyClick(reply)}
-                        disabled={isThinking}
-                        className="px-4 py-2 text-sm font-medium transition-colors duration-200 border rounded-full text-sky-300 bg-sky-900/50 border-sky-800 hover:bg-sky-900 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {reply}
-                    </button>
-                ))}
+            <div className="pb-3 mb-3 border-b border-slate-700">
+                <button
+                    onClick={() => setQuickRepliesExpanded(prev => !prev)}
+                    className="flex items-center gap-1 mb-2 text-xs font-medium text-slate-400 hover:text-slate-200 sm:hidden"
+                >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: quickRepliesExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                        <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                    {quickRepliesExpanded ? 'Hide suggestions' : 'Show suggestions'}
+                </button>
+                <div className={`flex flex-wrap items-center gap-2 ${quickRepliesExpanded ? 'flex' : 'hidden'} sm:flex`}>
+                    {quickReplies.map((reply, index) => (
+                        <button
+                            key={index}
+                            onClick={() => handleQuickReplyClick(reply)}
+                            disabled={isThinking}
+                            className="px-4 py-2 text-sm font-medium transition-colors duration-200 border rounded-full text-sky-300 bg-sky-900/50 border-sky-800 hover:bg-sky-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {reply}
+                        </button>
+                    ))}
+                </div>
             </div>
         )}
         {attachedImage && (
@@ -749,6 +796,7 @@ ${VOICE_PROMPT}
                     <div ref={exportMenuRef} className="absolute bottom-full left-0 z-10 w-64 mb-2 overflow-hidden bg-slate-700 border rounded-lg shadow-lg border-slate-600">
                         <button onClick={() => { setShowExportMenu(false); onGenerateReport(); }} className="flex items-center w-full gap-3 px-4 py-3 text-sm font-medium text-left text-slate-200 hover:bg-slate-600"><GenerateReportIcon /> File an Incident Report</button>
                         <button onClick={() => { setShowExportMenu(false); onGenerateResources(); }} className="flex items-center w-full gap-3 px-4 py-3 text-sm font-medium text-left text-slate-200 hover:bg-slate-600"><ResourcesIcon /> Compile Resources</button>
+                        <button onClick={() => { setShowExportMenu(false); handleDownloadConversation(); }} className="flex items-center w-full gap-3 px-4 py-3 text-sm font-medium text-left text-slate-200 hover:bg-slate-600"><DownloadIcon /> Save Conversation</button>
                     </div>
                 )}
             </div>
@@ -776,9 +824,9 @@ ${VOICE_PROMPT}
                   handleSend();
                 }
               }}
-              placeholder="Type your message here..."
+              placeholder="Message Safe Harbor..."
               rows={1}
-              className="w-full px-12 py-3 pr-28 text-base text-slate-200 transition-colors duration-200 border rounded-full resize-none bg-slate-700 border-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="w-full px-12 py-3 pr-24 text-sm text-slate-200 placeholder-slate-500 transition-colors duration-150 border rounded-2xl resize-none bg-slate-700/80 border-slate-600/80 focus:outline-none focus:ring-2 focus:ring-sky-500/70 focus:border-sky-500/50"
             />
             <div className="absolute inset-y-0 right-0 flex items-center pr-1">
                 <button
@@ -803,19 +851,7 @@ ${VOICE_PROMPT}
                                 <button
                                     onClick={handleSend}
                                     disabled={(!input.trim() && !attachedImage) || isThinking}
-                                    className="flex items-center justify-center w-12 h-12 text-white transition-colors duration-200 rounded-full bg-sky-600 border border-slate-600 hover:bg-sky-700 disabled:bg-sky-800 disabled:cursor-not-allowed"
-                                    style={{
-                                        boxSizing: 'border-box',
-                                        marginRight: '0px',
-                                        marginBottom: '4px',
-                                        background: 'inherit',
-                                        border: '1.5px solid #334155',
-                                        color: '#e2e8f0',
-                                        fontSize: '1rem',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        backgroundColor: '#0ea5e9', // matches input bar
-                                    }}
+                                    className="flex items-center justify-center w-10 h-10 text-white transition-colors duration-150 rounded-full bg-sky-500 hover:bg-sky-400 disabled:bg-sky-900 disabled:text-sky-700 disabled:cursor-not-allowed shadow-sm"
                                 >
                                     <SendIcon />
                                 </button>

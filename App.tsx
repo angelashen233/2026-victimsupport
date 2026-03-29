@@ -1,14 +1,12 @@
-  // ...existing code...
-
 import type { Chat } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ChatScreen from './components/ChatScreen';
 import DisclaimerScreen from './components/DisclaimerScreen';
-import { ExternalLinkIcon, ResourcesIcon } from './components/icons';
+import { ExternalLinkIcon } from './components/icons';
 import ReportScreen from './components/ReportScreen';
 import ResourcesScreen from './components/ResourcesScreen';
-import WaitTimeMenu, { WaitTime } from './components/WaitTimeMenu';
+import WaitTimeMenu from './components/WaitTimeMenu';
 import { initialUserProfile } from './data/userProfile';
 import { createAgent, INFO_PROMPT, LOCATION_PROMPT, MANAGER_PROMPT, OFFTOPIC_PROMPT } from './services/agents';
 import { generateReport, generateResources } from './services/geminiService';
@@ -18,15 +16,43 @@ import { MessageAuthor } from './types';
 type AppState = 'disclaimer' | 'chat' | 'report' | 'resources';
 export type AgentType = 'manager' | 'info' | 'location' | 'offtopic';
 
+// ── Shared close icon ──────────────────────────────────────────────────────
+const CloseIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+
+// ── App ────────────────────────────────────────────────────────────────────
 const App: React.FC = () => {
-  const [isScreenWide, setIsScreenWide] = useState(window.innerWidth >= 600);
-  useEffect(() => {
-    const handleResize = () => setIsScreenWide(window.innerWidth >= 600);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-  const [showLocationModal, setShowLocationModal] = useState(false);
-  // Handler to reset app to initial state
+  // ── State ────────────────────────────────────────────────
+  const [appState, setAppState]                     = useState<AppState>('disclaimer');
+  const [messages, setMessages]                     = useState<Message[]>([]);
+  const [reportData, setReportData]                 = useState<ReportData | null>(null);
+  const [recipients, setRecipients]                 = useState<Recipient[] | null>(null);
+  const [resources, setResources]                   = useState<Resource[] | null>(null);
+  const [error, setError]                           = useState<string | null>(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [isWriting, setIsWriting]                   = useState(false);
+  const [isGeneratingResources, setIsGeneratingResources] = useState(false);
+  const [activeAgent, setActiveAgent]               = useState<AgentType>('manager');
+  const [userProfile, setUserProfile]               = useState<UserProfile>(initialUserProfile);
+  const [isMenuOpen, setIsMenuOpen]                 = useState(false);
+  const [showHospitalModal, setShowHospitalModal]   = useState(false);
+  const [waitTimes, setWaitTimes]                   = useState<any[]>([]);
+  const [userLocation, setUserLocation]             = useState<{ lat: number; lng: number } | null>(null);
+  const [showMap, setShowMap]                       = useState(false);
+  const [darkMode, setDarkMode]                     = useState(true);
+  const [initialPrompt, setInitialPrompt]           = useState<string | null>(null);
+
+  // ── Refs ─────────────────────────────────────────────────
+  const aiRef           = useRef<GoogleGenAI | null>(null);
+  const managerChatRef  = useRef<Chat | null>(null);
+  const infoChatRef     = useRef<Chat | null>(null);
+  const locationChatRef = useRef<Chat | null>(null);
+  const offTopicChatRef = useRef<Chat | null>(null);
+
+  // ── Reset ─────────────────────────────────────────────────
   const handleStartOver = () => {
     setAppState('disclaimer');
     setMessages([]);
@@ -41,312 +67,206 @@ const App: React.FC = () => {
     setUserProfile(initialUserProfile);
     setIsMenuOpen(false);
     setShowHospitalModal(false);
-    setIsHospitalExpanded(false);
-    setShowNearestHospital(false);
     setShowMap(false);
+    setInitialPrompt(null);
   };
-  const [appState, setAppState] = useState<AppState>('disclaimer');
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [reportData, setReportData] = useState<ReportData | null>(null);
-  const [recipients, setRecipients] = useState<Recipient[] | null>(null);
-  const [resources, setResources] = useState<Resource[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-  const [isWriting, setIsWriting] = useState(false);
-  const [isGeneratingResources, setIsGeneratingResources] = useState(false);
-  const [activeAgent, setActiveAgent] = useState<AgentType>('manager');
-  const [userProfile, setUserProfile] = useState<UserProfile>(initialUserProfile);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [showHospitalModal, setShowHospitalModal] = useState(false);
-  const [isHospitalExpanded, setIsHospitalExpanded] = useState(false);
-  const [waitTimes, setWaitTimes] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
-  const [showNearestHospital, setShowNearestHospital] = useState(false);
-  const [showMap, setShowMap] = useState(false);
 
-  const aiRef = useRef<GoogleGenAI | null>(null);
-  const managerChatRef = useRef<Chat | null>(null);
-  const infoChatRef = useRef<Chat | null>(null);
-  const locationChatRef = useRef<Chat | null>(null);
-  const offTopicChatRef = useRef<Chat | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
+  // ── Init AI ───────────────────────────────────────────────
   useEffect(() => {
     try {
       const apiKey = process.env.API_KEY;
-      if (!apiKey) {
-        throw new Error("API_KEY not found");
-      }
+      if (!apiKey) throw new Error('API_KEY not found');
       aiRef.current = new GoogleGenAI({ apiKey });
     } catch (e) {
       console.error(e);
-      setError("Could not initialize the AI service. Please check your configuration.");
+      setError('Could not initialize the AI service. Please check your configuration.');
     }
   }, []);
 
+  // ── Fetch hospital data + resources ───────────────────────
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-        if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-            setIsMenuOpen(false);
-        }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  useEffect(() => {
-    // Fetch hospital wait times
-    fetch("https://edwaittimes.ca/api/wait-times")
-      .then((response) => response.json())
-      .then((data) => {
+    fetch('https://edwaittimes.ca/api/wait-times')
+      .then(r => r.json())
+      .then(data => {
         setWaitTimes(data);
-        setLoading(false);
-        try {
-          localStorage.setItem('hospital_wait_times', JSON.stringify(data));
-        } catch (e) {
-          console.error('Failed to save hospital wait times to localStorage:', e);
-        }
+        try { localStorage.setItem('hospital_wait_times', JSON.stringify(data)); } catch {}
       })
-      .catch((error) => {
-        console.error("Error fetching wait times:", error);
-        setLoading(false);
-      });
-    // Load victim support resources from local file into localStorage
+      .catch(e => console.error('Error fetching wait times:', e));
+
     fetch('/info-data/victim_support.json')
-      .then((response) => response.json())
-      .then((data) => {
-        try {
-          localStorage.setItem('victim_support_resources', JSON.stringify(data));
-        } catch (e) {
-          console.error('Failed to save victim support resources to localStorage:', e);
-        }
+      .then(r => r.json())
+      .then(data => {
+        try { localStorage.setItem('victim_support_resources', JSON.stringify(data)); } catch {}
       })
-      .catch((error) => {
-        console.error('Error loading victim support resources:', error);
-      });
+      .catch(e => console.error('Error loading victim support resources:', e));
   }, []);
 
-  // Sync userProfile.location with userLocation
+  // ── Sync location → profile ────────────────────────────────
   useEffect(() => {
     if (userLocation) {
       setUserProfile(prev => ({
         ...prev,
-        location: `Lat: ${userLocation.lat}, Lng: ${userLocation.lng}`
+        location: `Lat: ${userLocation.lat}, Lng: ${userLocation.lng}`,
       }));
     }
   }, [userLocation]);
 
-  // Update userLocation on initial app load
-
-  // Request user location on mount
+  // ── Request geolocation ────────────────────────────────────
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-          setShowNearestHospital(true);
-        },
-        (error) => {
-          setError("Could not get your location.");
-        }
+        pos => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => setError('Could not get your location.'),
       );
-    } else {
-      setError("Geolocation is not supported by your browser.");
     }
   }, []);
 
-  const handleStartChat = useCallback(() => {
+  // ── Background image per mode ──────────────────────────────
+  useEffect(() => {
+    const body = document.body;
+    body.style.backgroundImage = darkMode
+      ? "url('https://images.unsplash.com/photo-1508402476522-c77c2fa4479d?q=80&w=2070&auto=format&fit=crop')"
+      : "url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1500&q=80')";
+    body.style.backgroundSize     = 'cover';
+    body.style.backgroundPosition = 'center';
+    body.style.color              = darkMode ? '#e2e8f0' : '#222';
+  }, [darkMode]);
+
+  // ── Utility: Haversine distance ────────────────────────────
+  function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  // ── Nearest hospitals ──────────────────────────────────────
+  const nearestHospitals = userLocation && waitTimes.length > 0
+    ? [...waitTimes]
+        .map(h => ({ hospital: h, dist: getDistance(userLocation.lat, userLocation.lng, h.latitude, h.longitude) }))
+        .sort((a, b) => a.dist - b.dist)
+        .slice(0, 2)
+    : [];
+
+  // ── Start chat ─────────────────────────────────────────────
+  const handleStartChat = useCallback((prompt?: string) => {
     if (!aiRef.current) {
-        setError("AI service is not initialized. Please refresh the page.");
-        return;
+      setError('AI service is not available. Please check your API key and refresh.');
+      return;
     }
-    let hospitalData = [];
+    if (prompt) setInitialPrompt(prompt);
+    let hospitalData: any[] = [];
     try {
       const stored = localStorage.getItem('hospital_wait_times');
       if (stored) {
-        const rawData = JSON.parse(stored);
-        hospitalData = rawData.map(h => ({
-          name: h.name,
-          address: h.address,
-          latitude: h.latitude,
-          longitude: h.longitude,
+        hospitalData = JSON.parse(stored).map((h: any) => ({
+          name: h.name, address: h.address,
+          latitude: h.latitude, longitude: h.longitude,
           waitTime: h.waitTime?.waitTimeMinutes ?? null,
-          open247: !!h.open247
+          open247: !!h.open247,
         }));
       }
-    } catch (e) {
-      console.error('Failed to load hospital data from localStorage:', e);
-    }
-    // Prepare a summary string for Gemini
-    let hospitalSummary = '';
-    if (hospitalData && hospitalData.length > 0) {
-      hospitalSummary = '\n---\nHOSPITAL DATA (JSON):\n' + JSON.stringify(hospitalData, null, 2) + '\n---';
-    }
+    } catch (e) { console.error('Failed to load hospital data:', e); }
 
-    // Victim support resource filtering
-    let victimResources = [];
-    try {
-      const stored = localStorage.getItem('victim_support_resources');
-      if (stored) {
-        const rawResources = JSON.parse(stored);
-        // Filter by type/description match and nearest location
-        if (messages.length > 0 && userLocation) {
-          const lastMsg = messages[messages.length - 1].text?.toLowerCase() || '';
-          // Find resources matching type/description
-          const filtered = rawResources.filter(r => {
-            return (
-              (r.type && lastMsg.includes(r.type.toLowerCase())) ||
-              (r.description && lastMsg.includes(r.description.toLowerCase()))
-            );
-          });
-          // Sort by distance to user
-          const withDistance = filtered.map(r => {
-            // Try to parse coordinates from address (if available)
-            // For demo, use city match only
-            let dist = 99999;
-            if (r.city && userProfile.location) {
-              dist = r.city.toLowerCase() === userProfile.location.toLowerCase() ? 0 : 99999;
-            }
-            return { ...r, dist };
-          });
-          victimResources = withDistance.sort((a, b) => a.dist - b.dist).slice(0, 1); // Only nearest
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load victim support resources from localStorage:', e);
-    }
-    let victimResourceSummary = '';
-    if (victimResources.length > 0) {
-      const r = victimResources[0];
-      victimResourceSummary = `\n---\nVICTIM SUPPORT RESOURCE:\nName: ${r.name}\nDescription: ${r.description}\nWebsite: ${r.website}\nPhone: ${r.phone}\nAddress: ${r.address}\n---`;
-    }
-    try {
-      // Add hospital data to userProfile context and system prompt
-      const userProfileWithHospitals = {
-        ...userProfile,
-        hospitalData
-      };
-      const prependToPrompt = (basePrompt: string) => `${hospitalSummary}\n${basePrompt}`;
-      managerChatRef.current = createAgent(aiRef.current, prependToPrompt(MANAGER_PROMPT), userProfileWithHospitals);
-      infoChatRef.current = createAgent(aiRef.current, prependToPrompt(INFO_PROMPT), userProfileWithHospitals);
-      locationChatRef.current = createAgent(aiRef.current, prependToPrompt(LOCATION_PROMPT), userProfileWithHospitals);
-      offTopicChatRef.current = createAgent(aiRef.current, prependToPrompt(OFFTOPIC_PROMPT), userProfileWithHospitals);
+    const hospitalSummary = hospitalData.length > 0
+      ? '\n---\nHOSPITAL DATA (JSON):\n' + JSON.stringify(hospitalData, null, 2) + '\n---'
+      : '';
 
-      setMessages([
-        {
-          author: MessageAuthor.AI,
-          text: "Hello. I'm here to listen and support you in a safe and confidential space. Please feel free to share what's on your mind when you're ready. Remember, this is not a substitute for professional help."
-        }
-      ]);
+    try {
+      const userProfileWithHospitals = { ...userProfile, hospitalData };
+      const prepend = (base: string) => `${hospitalSummary}\n${base}`;
+      managerChatRef.current  = createAgent(aiRef.current, prepend(MANAGER_PROMPT),  userProfileWithHospitals);
+      infoChatRef.current     = createAgent(aiRef.current, prepend(INFO_PROMPT),     userProfileWithHospitals);
+      locationChatRef.current = createAgent(aiRef.current, prepend(LOCATION_PROMPT), userProfileWithHospitals);
+      offTopicChatRef.current = createAgent(aiRef.current, prepend(OFFTOPIC_PROMPT), userProfileWithHospitals);
+
+      setMessages([{
+        author: MessageAuthor.AI,
+        text: "Hello. I'm here to listen and support you in a safe and confidential space. Please feel free to share what's on your mind when you're ready. Remember, this is not a substitute for professional help.",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }]);
       setActiveAgent('manager');
       setAppState('chat');
       setIsWriting(false);
     } catch (e) {
       console.error(e);
-      setError("Could not initialize the AI assistant. Please check your API key and refresh the page.");
+      setError('Could not initialize the AI assistant. Please check your API key and refresh the page.');
     }
   }, [userProfile]);
 
+  // ── Generate report ────────────────────────────────────────
   const handleGenerateReport = useCallback(async () => {
     setIsGeneratingReport(true);
     setError(null);
     try {
-      if (!aiRef.current) throw new Error("AI not initialized");
+      if (!aiRef.current) throw new Error('AI not initialized');
       const result = await generateReport(aiRef.current, messages, userProfile);
       setReportData(result.report);
       setRecipients(result.recipients);
       setAppState('report');
     } catch (e) {
       console.error(e);
-      setError("I'm sorry, I encountered an error while generating the report. Please try again or refine the conversation.");
+      setError("I'm sorry, I encountered an error while generating the report. Please try again.");
     } finally {
       setIsGeneratingReport(false);
     }
   }, [messages, userProfile]);
 
+  // ── Generate resources ─────────────────────────────────────
   const handleGenerateResources = useCallback(async () => {
     setIsGeneratingResources(true);
     setError(null);
     try {
-      if (!aiRef.current) throw new Error("AI not initialized");
+      if (!aiRef.current) throw new Error('AI not initialized');
       const result = await generateResources(aiRef.current, messages, userProfile);
       setResources(result.resources);
       setAppState('resources');
     } catch (e) {
       console.error(e);
-      setError("I'm sorry, I encountered an error while compiling resources. Please try again or check the conversation for clarity.");
+      setError("I'm sorry, I encountered an error while compiling resources. Please try again.");
     } finally {
       setIsGeneratingResources(false);
     }
   }, [messages, userProfile]);
 
-  const handleBackToChat = () => {
-    setAppState('chat');
-  };
-  // ...existing code...
-  // ...existing code...
+  const handleBackToChat = () => setAppState('chat');
 
-  // Utility: Save hospital wait times to local file
-  const saveHospitalWaitTimesSnapshot = useCallback(() => {
-    try {
-      // Only save if waitTimes is non-empty
-      if (waitTimes && waitTimes.length > 0) {
-        fetch('/data/hospital_wait_times_snapshot.json', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(waitTimes, null, 2)
-        });
-      }
-    } catch (e) {
-      console.error('Failed to save hospital wait times snapshot:', e);
+  // ── Hospital wait time formatter ───────────────────────────
+  const formatHospitalForMenu = (h: any) => {
+    let waitTimeStr = 'N/A';
+    if (h.waitTime && typeof h.waitTime.waitTimeMinutes === 'number') {
+      const mins = h.waitTime.waitTimeMinutes;
+      const hPart = Math.floor(mins / 60);
+      const mPart = mins % 60;
+      waitTimeStr = `${hPart > 0 ? hPart + 'h ' : ''}${mPart}m`;
     }
-  }, [waitTimes]);
+    return {
+      name: h.name,
+      address: h.address,
+      city: h.city || h.region || '',
+      waitTime: waitTimeStr,
+      updated: h.waitTime?.createdAt
+        ? `Updated ${new Date(h.waitTime.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+        : 'Updated just now',
+      note: h.notes || h.openStatus || h.description || '',
+      distance: userLocation
+        ? getDistance(userLocation.lat, userLocation.lng, h.latitude, h.longitude).toFixed(2) + ' km'
+        : undefined,
+    };
+  };
 
-  // Utility: Calculate distance between two lat/lng points
-  function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-    const R = 6371; // km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * Math.PI / 180) *
-      Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  }
-
-  // Find the two nearest hospitals
-  const nearestHospitals =
-    userLocation && waitTimes.length > 0
-      ? [...waitTimes]
-          .map(hospital => ({
-            hospital,
-            dist: getDistance(
-              userLocation.lat,
-              userLocation.lng,
-              hospital.latitude,
-              hospital.longitude
-            )
-          }))
-          .sort((a, b) => a.dist - b.dist)
-          .slice(0, 2)
-      : [];
-
-  const nearest = nearestHospitals[0];
-  const secondNearest = nearestHospitals[1];
-
+  // ── Screen content ─────────────────────────────────────────
   const renderContent = () => {
     switch (appState) {
       case 'disclaimer':
-        return <DisclaimerScreen onAccept={handleStartChat} />;
+        return (
+          <DisclaimerScreen
+            onAccept={() => handleStartChat()}
+            onSelectPrompt={(prompt) => handleStartChat(prompt)}
+            error={error}
+          />
+        );
       case 'chat':
         return (
           <ChatScreen
@@ -355,10 +275,10 @@ const App: React.FC = () => {
             messages={messages}
             setMessages={setMessages}
             chats={{
-                manager: managerChatRef.current,
-                info: infoChatRef.current,
-                location: locationChatRef.current,
-                offtopic: offTopicChatRef.current,
+              manager: managerChatRef.current,
+              info: infoChatRef.current,
+              location: locationChatRef.current,
+              offtopic: offTopicChatRef.current,
             }}
             activeAgent={activeAgent}
             setActiveAgent={setActiveAgent}
@@ -370,266 +290,279 @@ const App: React.FC = () => {
             setError={setError}
             isWriting={isWriting}
             setIsWriting={setIsWriting}
+            initialPrompt={initialPrompt}
+            onInitialPromptSent={() => setInitialPrompt(null)}
           />
         );
       case 'report':
         return (
-          <ReportScreen
-            reportData={reportData}
-            recipients={recipients}
-            onBackToChat={handleBackToChat}
-            onStartOver={handleStartOver}
-          />
+          <div className="flex-1 overflow-y-auto">
+            <ReportScreen
+              reportData={reportData}
+              recipients={recipients}
+              onBackToChat={handleBackToChat}
+              onStartOver={handleStartOver}
+            />
+          </div>
         );
       case 'resources':
         return (
-          <ResourcesScreen
-            resources={resources}
-            onBackToChat={handleBackToChat}
-            onStartOver={handleStartOver}
-          />
+          <div className="flex-1 overflow-y-auto">
+            <ResourcesScreen
+              resources={resources}
+              onBackToChat={handleBackToChat}
+              onStartOver={handleStartOver}
+            />
+          </div>
         );
       default:
-        return <DisclaimerScreen onAccept={handleStartChat} />;
+        return (
+          <DisclaimerScreen
+            onAccept={() => handleStartChat()}
+            onSelectPrompt={(prompt) => handleStartChat(prompt)}
+            error={error}
+          />
+        );
     }
   };
 
-  const [showIconInfo, setShowIconInfo] = useState(false);
-  const [showImageInfo, setShowImageInfo] = useState(false);
-  const [darkMode, setDarkMode] = useState(true);
-  const AppHeader = () => {
-    // Always render icons as fixed, repositioned, and visible
-    const iconStyle: React.CSSProperties = appState === 'chat'
-      ? {
-          position: 'fixed',
-          top: '70px',
-          left: 'calc(50% - 370px)', // 70px left from chat screen (assuming chat is centered)
-          zIndex: 2000,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          alignItems: 'center',
-        }
-      : {
-          position: 'fixed',
-          top: '32px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 2000,
-          display: 'flex',
-          flexDirection: 'row',
-          gap: '16px',
-          alignItems: 'center',
-        };
-    return (
-      <div style={iconStyle}>
-        <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setShowImageInfo(true)}>
-          <ResourcesIcon />
-        </button>
-        <button className={`flex items-center justify-center w-10 h-10 ${darkMode ? 'text-white bg-black' : 'text-blue-700 bg-white'} transition-colors duration-200 rounded-full bg-opacity-20 backdrop-blur-sm hover:bg-blue-200`} onClick={() => setDarkMode(!darkMode)} aria-label="Toggle dark mode">
-          {darkMode ? (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v2M12 19v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 7a5 5 0 100 10 5 5 0 000-10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          ) : (
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          )}
-        </button>
-        {/* Popup for image info */}
-        {showImageInfo && (
-          <div style={{
-            position: 'fixed',
-            top: appState === 'chat' ? '240px' : '80px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: '#fff',
-            color: '#222',
-            padding: '1rem 2rem',
-            borderRadius: '1rem',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            zIndex: 2100,
-            minWidth: '260px',
-            textAlign: 'center'
-          }}>
-            <div style={{marginBottom: '0.5rem', fontWeight: 'bold'}}>Background Image Info</div>
-            <div>Image source: <a href="https://unsplash.com/photos/green-northern-lights-xGltqb1ChYw" target="_blank" rel="noopener noreferrer">Unsplash: Green Northern Lights by Luke Stackpoole</a></div>
-            <button style={{marginTop: '1rem', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 16px', cursor: 'pointer'}} onClick={() => setShowImageInfo(false)}>Close</button>
-          </div>
-        )}
-      </div>
-    );
-  };
+  // ── Tailwind helpers (mode-aware) ──────────────────────────
+  const dm = darkMode;
+  const surface   = dm ? 'bg-slate-900'  : 'bg-white';
+  const surface2  = dm ? 'bg-slate-800'  : 'bg-gray-50';
+  const border    = dm ? 'border-slate-700/60' : 'border-gray-200';
+  const textMain  = dm ? 'text-slate-100' : 'text-gray-900';
+  const textMuted = dm ? 'text-slate-500' : 'text-gray-400';
+  const rowHover  = dm ? 'hover:bg-white/6' : 'hover:bg-black/4';
 
-  // Set background and text color based on mode
-  React.useEffect(() => {
-    const body = document.body;
-    if (darkMode) {
-      body.style.backgroundImage = "url('https://images.unsplash.com/photo-1508402476522-c77c2fa4479d?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D')";
-      body.style.backgroundSize = "cover";
-      body.style.backgroundPosition = "center";
-      body.style.color = "#e2e8f0";
-    } else {
-      body.style.backgroundImage = "url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1500&q=80')";
-      body.style.backgroundSize = "cover";
-      body.style.backgroundPosition = "center";
-      body.style.color = "#222";
-    }
-  }, [darkMode]);
-
+  // ── Render ─────────────────────────────────────────────────
   return (
-    <div className={`relative flex flex-col h-screen font-sans ${darkMode ? 'text-slate-200' : 'text-black'}`}
-      style={{background: 'transparent'}}>
-      {/* Always visible exit button, top left, above hospitals */}
-      <button
-        style={{
-          position: "fixed",
-          top: "24px",
-          left: "24px",
-          zIndex: 2000,
-          background: darkMode ? "#0f172a" : "#fff",
-          color: darkMode ? "#fff" : "#222",
-          border: "none",
-          borderRadius: "8px",
-          padding: "8px 16px",
-          fontSize: "1rem",
-          fontWeight: "bold",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-          cursor: "pointer"
-        }}
-        onClick={() => window.location.href = "https://google.com"}
-        aria-label="Exit"
-      >
-        Exit
-      </button>
-      {appState !== 'chat' && <AppHeader />}
-      {/* Floating nearest hospital component + location identifier below */}
-  {isScreenWide && userLocation && nearestHospitals.length > 0 && (
-        <div style={{ position: "fixed", top: "80px", left: "32px", zIndex: 50, maxWidth: "350px" }}>
-          {/* Nearest hospital info styled like location identifier, less bright */}
-          <div
-            style={{
-              background: darkMode ? "rgba(51,65,85,0.85)" : "rgba(255,255,255,0.85)",
-              color: darkMode ? "#fff" : "#222",
-              padding: "0.75rem 1.5rem",
-              borderRadius: "1rem",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-              fontSize: "1rem",
-              textAlign: "left",
-              marginBottom: "0.5rem"
-            }}
-          >
-            <div style={{fontWeight: 'bold', marginBottom: '0.5rem'}}>Nearest Hospitals</div>
-            {nearestHospitals.map((entry, idx) => {
-              const waitTime = entry.hospital.waitTime?.waitTimeMinutes;
-              let waitStr = "N/A";
-              if (typeof waitTime === "number") {
-                const hr = Math.floor(waitTime / 60);
-                const min = waitTime % 60;
-                waitStr = hr > 0 ? `${hr} hr ${min} min` : `${min} min`;
-              }
-              const mapUrl = `https://www.google.com/maps/search/?api=1&query=${entry.hospital.latitude},${entry.hospital.longitude}`;
-              return (
-                <div key={entry.hospital.id} style={{ marginBottom: "0.5rem", display: 'flex', flexDirection: 'column' }}>
-                  <a
-                    href={mapUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      fontWeight: 'bold',
-                      color: darkMode ? '#38bdf8' : '#0ea5e9',
-                      textDecoration: 'underline',
-                      cursor: 'pointer',
-                      fontSize: '1.05rem',
-                      marginBottom: '0.2rem',
-                      width: 'fit-content'
-                    }}
-                  >
-                    {idx === 0 ? "Nearest" : `#${idx + 1}`} Hospital: {entry.hospital.name}
-                  </a>
-                  <span style={{fontSize: '0.95rem'}}>Wait Time: {waitStr}</span>
-                </div>
-              );
-            })}
-          </div>
-          {/* Location identifier directly below hospital info, less bright */}
-          <div
-            style={{
-              background: darkMode ? "rgba(51,65,85,0.85)" : "rgba(255,255,255,0.85)",
-              color: darkMode ? "#fff" : "#222",
-              padding: "0.75rem 1.5rem",
-              borderRadius: "1rem",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-              fontSize: "1rem",
-              textAlign: "left",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.75rem",
-              cursor: "pointer"
-            }}
-            onClick={() => setShowMap(true)}
-          >
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '0.5rem'}}><path d="M21 10.5a8.38 8.38 0 01-1.9 5.4c-1.5 2-4.1 5.1-4.1 5.1a1.38 1.38 0 01-2 0s-2.6-3.1-4.1-5.1A8.38 8.38 0 013 10.5 7.5 7.5 0 0112 3a7.5 7.5 0 019 7.5z"></path><circle cx="12" cy="10.5" r="2.5"></circle></svg>
-            <div>
-              <div style={{fontWeight: 'bold'}}>Your Location</div>
-              <div style={{fontSize: '0.95rem'}}>Lat: {userLocation.lat}, Lng: {userLocation.lng}</div>
-              <div style={{fontSize: '0.85rem', opacity: 0.7}}>Click to expand map</div>
-            </div>
-          </div>
-        </div>
-      )}
+    <div
+      className={`flex flex-col overflow-hidden font-sans ${dm ? 'text-slate-200' : 'text-gray-900'}`}
+      style={{ height: '100dvh' }}
+    >
 
-      {/* Expandable Google Map Modal */}
+      {/* ══════════════════════════════════════════════════════
+          NAVBAR
+      ══════════════════════════════════════════════════════ */}
+      <nav
+        className={`flex-shrink-0 flex items-center justify-between px-3 sm:px-4 z-30 border-b backdrop-blur-md ${surface}/80 ${border}`}
+        style={{ height: '56px' }}
+      >
+        {/* Hamburger */}
+        <button
+          onClick={() => setIsMenuOpen(true)}
+          className={`w-10 h-10 flex items-center justify-center rounded-xl transition-colors duration-150 ${dm ? 'text-slate-300 hover:bg-white/8' : 'text-gray-600 hover:bg-black/5'}`}
+          aria-label="Open menu"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="6"  x2="21" y2="6"  />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+
+        {/* Title */}
+        <span className={`font-semibold text-[15px] tracking-tight select-none ${textMain}`}>
+          Safe Harbor
+        </span>
+
+        {/* Exit */}
+        <button
+          onClick={() => window.location.href = 'https://google.com'}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 active:bg-red-800 rounded-lg transition-colors duration-150 shadow-sm"
+          aria-label="Exit to safety"
+        >
+          Exit
+        </button>
+      </nav>
+
+
+      {/* ══════════════════════════════════════════════════════
+          SIDEBAR OVERLAY
+      ══════════════════════════════════════════════════════ */}
+      <div
+        className="fixed inset-0 z-40 bg-black/50 modal-overlay"
+        style={{
+          opacity: isMenuOpen ? 1 : 0,
+          pointerEvents: isMenuOpen ? 'auto' : 'none',
+        }}
+        onClick={() => setIsMenuOpen(false)}
+        aria-hidden="true"
+      />
+
+
+      {/* ══════════════════════════════════════════════════════
+          SIDEBAR DRAWER
+      ══════════════════════════════════════════════════════ */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col shadow-2xl sidebar-drawer border-r ${surface} ${border} ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{ width: '280px' }}
+      >
+        {/* Header */}
+        <div
+          className={`flex items-center justify-between px-4 flex-shrink-0 border-b ${border}`}
+          style={{ height: '56px' }}
+        >
+          <span className={`font-semibold text-[15px] ${textMain}`}>Menu</span>
+          <button
+            onClick={() => setIsMenuOpen(false)}
+            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors duration-150 ${dm ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-black/5 text-gray-500'}`}
+            aria-label="Close menu"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        {/* Scroll area */}
+        <div className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
+
+          {/* ── Nearest Hospitals card ─────────────────────── */}
+          {nearestHospitals.length > 0 && (
+            <div className={`rounded-xl overflow-hidden mb-1 ${surface2} border ${border}`}>
+              <p className={`px-3 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider ${textMuted}`}>
+                Nearest Hospitals
+              </p>
+              {nearestHospitals.map((entry, idx) => {
+                const waitMins = entry.hospital.waitTime?.waitTimeMinutes;
+                let waitStr = 'N/A';
+                let waitColor = dm ? 'text-slate-400' : 'text-gray-400';
+                if (typeof waitMins === 'number') {
+                  const hr  = Math.floor(waitMins / 60);
+                  const min = waitMins % 60;
+                  waitStr   = hr > 0 ? `${hr}h ${min}m` : `${min}m`;
+                  waitColor = waitMins < 60 ? 'text-green-400' : 'text-yellow-400';
+                }
+                const mapUrl = `https://www.google.com/maps/search/?api=1&query=${entry.hospital.latitude},${entry.hospital.longitude}`;
+                return (
+                  <div key={idx} className={`px-3 py-2 ${idx > 0 ? `border-t ${border}` : ''}`}>
+                    <a
+                      href={mapUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`text-sm font-medium leading-snug hover:underline ${dm ? 'text-sky-400' : 'text-blue-600'}`}
+                    >
+                      {entry.hospital.name}
+                    </a>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-xs font-semibold ${waitColor}`}>{waitStr}</span>
+                      <span className={`text-xs ${textMuted}`}>· {entry.dist.toFixed(1)} km</span>
+                    </div>
+                  </div>
+                );
+              })}
+              <button
+                onClick={() => { setShowHospitalModal(true); setIsMenuOpen(false); }}
+                className={`w-full px-3 py-2 text-left text-xs font-medium border-t transition-colors duration-150 ${border} ${dm ? 'text-sky-400 hover:bg-white/6' : 'text-blue-600 hover:bg-black/4'}`}
+              >
+                View all hospitals →
+              </button>
+            </div>
+          )}
+
+          {/* ── Your Location ──────────────────────────────── */}
+          {userLocation && (
+            <button
+              onClick={() => { setShowMap(true); setIsMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl transition-colors duration-150 ${textMain} ${rowHover}`}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-sky-400">
+                <path d="M21 10.5a8.38 8.38 0 01-1.9 5.4c-1.5 2-4.1 5.1-4.1 5.1a1.38 1.38 0 01-2 0s-2.6-3.1-4.1-5.1A8.38 8.38 0 013 10.5 7.5 7.5 0 0112 3a7.5 7.5 0 019 7.5z" />
+                <circle cx="12" cy="10.5" r="2.5" />
+              </svg>
+              <div className="text-left min-w-0">
+                <div className="font-medium">Your Location</div>
+                <div className={`text-xs mt-0.5 truncate ${textMuted}`}>
+                  {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
+                </div>
+              </div>
+            </button>
+          )}
+
+          {/* ── RAINN.org ──────────────────────────────────── */}
+          <a
+            href="https://www.rainn.org/"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setIsMenuOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl transition-colors duration-150 ${textMain} ${rowHover}`}
+          >
+            <ExternalLinkIcon className="flex-shrink-0 text-sky-400" />
+            <span className="font-medium">RAINN.org Support Chat</span>
+          </a>
+
+          {/* ── Dark / Light mode ──────────────────────────── */}
+          <button
+            onClick={() => setDarkMode(!dm)}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl transition-colors duration-150 ${textMain} ${rowHover}`}
+          >
+            {dm ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-yellow-400">
+                <circle cx="12" cy="12" r="5" />
+                <line x1="12" y1="1"  x2="12" y2="3"  /><line x1="12" y1="21" x2="12" y2="23" />
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                <line x1="1"  y1="12" x2="3"  y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-slate-400">
+                <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" />
+              </svg>
+            )}
+            <span className="font-medium">{dm ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
+
+          {/* Divider */}
+          <div className={`my-1.5 h-px mx-1 ${dm ? 'bg-slate-700/60' : 'bg-gray-100'}`} />
+
+          {/* ── New Session ────────────────────────────────── */}
+          <button
+            onClick={() => { handleStartOver(); setIsMenuOpen(false); }}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl transition-colors duration-150 ${dm ? 'text-red-400 hover:bg-red-900/25' : 'text-red-500 hover:bg-red-50'}`}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
+            </svg>
+            <span className="font-medium">New Session</span>
+          </button>
+        </div>
+      </aside>
+
+
+      {/* ══════════════════════════════════════════════════════
+          MAIN CONTENT
+      ══════════════════════════════════════════════════════ */}
+      <main className="flex flex-col flex-1 overflow-hidden">
+        {renderContent()}
+      </main>
+
+
+      {/* ══════════════════════════════════════════════════════
+          MAP MODAL
+      ══════════════════════════════════════════════════════ */}
       {userLocation && showMap && (
         <div
-          style={{
-            position: "fixed",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: "80vw",
-            height: "60vh",
-            background: darkMode ? "#334155" : "#fff",
-            color: darkMode ? "#fff" : "#222",
-            zIndex: 200,
-            borderRadius: "16px",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
-            padding: 0,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            overflow: "hidden"
-          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm modal-overlay opacity-100"
+          onClick={() => setShowMap(false)}
         >
-          <div style={{ position: "relative", width: "100%", height: "100%" }}>
+          <div
+            className="modal-panel relative w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl"
+            style={{ height: '60vh' }}
+            onClick={e => e.stopPropagation()}
+          >
             <button
               onClick={() => setShowMap(false)}
-              style={{
-                position: "absolute",
-                top: 12,
-                right: 12,
-                zIndex: 10,
-                background: darkMode ? "#0f172a" : "#fff",
-                color: darkMode ? "#fff" : "#222",
-                border: "none",
-                borderRadius: "50%",
-                width: "32px",
-                height: "32px",
-                fontSize: "1.5rem",
-                fontWeight: "bold",
-                cursor: "pointer",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 0
-              }}
+              className={`absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full shadow-lg transition-colors duration-150 ${dm ? 'bg-slate-800 text-slate-200 hover:bg-slate-700' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
               aria-label="Close map"
             >
-              &times;
+              <CloseIcon />
             </button>
             <iframe
-              title="Google Map"
+              title="Your Location Map"
               width="100%"
               height="100%"
-              style={{ border: 0, borderRadius: '12px', display: 'block' }}
+              style={{ border: 0, display: 'block' }}
               src={`https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}&z=15&output=embed`}
               allowFullScreen
               loading="lazy"
@@ -637,225 +570,46 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
-      <main className="flex flex-col flex-1">
-        {renderContent()}
-      </main>
-      {/* Hamburger Menu (moved to top right) */}
-      <div style={{
-        position: "fixed",
-        top: "10px",
-        right: "10px",
-        zIndex: 100
-      }}>
-        <button
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-          style={{
-            background: darkMode ? "#0f172a" : "#fff",
-            color: darkMode ? "#fff" : "#222",
-            border: "none",
-            borderRadius: "8px",
-            padding: "8px 12px",
-            fontSize: "1.5rem",
-            cursor: "pointer"
-          }}
-          aria-label="Open menu"
-        >
-          ☰
-        </button>
-        {isMenuOpen && (
-          <div style={{
-            position: "fixed",
-            top: "58px",
-            right: "10px",
-            width: "240px",
-            background: darkMode ? "#1e293b" : "#fff",
-            color: darkMode ? "#fff" : "#222",
-            borderRadius: "8px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-            padding: "12px",
-            zIndex: 101
-          }}>
-            <div
-              style={{
-                cursor: "pointer",
-                fontWeight: "bold",
-                marginBottom: "12px"
-              }}
-              onClick={() => setShowHospitalModal(true)}
-            >
-              Hospital wait time
-            </div>
-            <div
-              style={{
-                cursor: "pointer",
-                fontWeight: "bold",
-                marginBottom: "12px"
-              }}
-              onClick={() => setShowLocationModal(true)}
-            >
-              Your Location
-            </div>
-            <a
-              href="https://www.rainn.org/"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: "block",
-                fontWeight: "bold",
-                marginBottom: "12px",
-                color: darkMode ? "#fff" : "#222",
-                textDecoration: "underline"
-              }}
-            >
-              RAINN.org (Support Chat)
-            </a>
-            <div
-              style={{
-                cursor: "pointer",
-                fontWeight: "bold",
-                marginBottom: "12px"
-              }}
-              onClick={handleStartOver}
-            >
-              New Session
-            </div>
-            {/* Emergency Resources link removed as requested */}
-          </div>
-        )}
-      </div>
-      {/* Large Hospital Wait-Time Modal */}
+
+
+      {/* ══════════════════════════════════════════════════════
+          HOSPITAL WAIT TIMES MODAL
+      ══════════════════════════════════════════════════════ */}
       {showHospitalModal && (
         <div
-          style={{
-            position: "fixed",
-            top: "50px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: "80vw",
-            height: "70vh",
-            background: darkMode ? "#334155" : "#fff",
-            color: darkMode ? "#fff" : "#222",
-            zIndex: 200,
-            borderRadius: "16px",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
-            padding: "32px",
-            overflowY: "auto",
-            display: "flex",
-            flexDirection: "column"
-          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm modal-overlay opacity-100"
+          onClick={() => setShowHospitalModal(false)}
         >
-          {/* Hospital modal content should go here, e.g. hospital list rendering */}
-          {userProfile.hospitalData && userProfile.hospitalData.length > 0 ? (
-            userProfile.hospitalData.map((entry, idx) => {
-              const waitTime = entry.waitTime;
-              return (
-                <div key={entry.name} style={{ marginBottom: "1rem", fontSize: "1.1rem" }}>
-                  <strong>{idx === 0 ? "Nearest" : `#${idx + 1}`} Hospital: {entry.name}</strong><br />
-                  Wait Time: {waitTime ?? "N/A"} minutes<br />
-                  Address: {entry.address}<br />
-                  {entry.latitude && entry.longitude && (
-                    <a href={`https://www.google.com/maps/search/?api=1&query=${entry.latitude},${entry.longitude}`} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'underline' }}>Open in Google Maps</a>
-                  )}
-                  {entry.open247 && <span style={{ marginLeft: '8px', color: '#16a34a' }}>(24/7)</span>}
-                </div>
-              );
-            })
-          ) : (
-            <div>No hospital data available.</div>
-          )}
-        </div>
-      )}
-      {/* Location Modal */}
-      {showLocationModal && (
-        <div
-          style={{
-            position: "fixed",
-            top: "50px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: "400px",
-            background: darkMode ? "#334155" : "#fff",
-            color: darkMode ? "#fff" : "#222",
-            zIndex: 200,
-            borderRadius: "16px",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
-            padding: "32px",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center"
-          }}
-        >
-          <button
-            onClick={() => setShowLocationModal(false)}
-            style={{
-              alignSelf: "flex-end",
-              background: darkMode ? "#0f172a" : "#fff",
-              color: darkMode ? "#fff" : "#222",
-              border: "none",
-              borderRadius: "8px",
-              padding: "8px 12px",
-              fontSize: "1rem",
-              cursor: "pointer",
-              marginBottom: "16px"
-            }}
+          <div
+            className={`modal-panel relative w-full max-w-3xl flex flex-col rounded-2xl shadow-2xl overflow-hidden ${dm ? 'bg-slate-800' : 'bg-white'}`}
+            style={{ maxHeight: '80vh' }}
+            onClick={e => e.stopPropagation()}
           >
-            Close
-          </button>
-          <h2 style={{ marginBottom: "16px" }}>Your Location</h2>
-          {userLocation ? (
-            <div style={{ fontSize: "1.1rem", textAlign: "center" }}>
-              <div><strong>Latitude:</strong> {userLocation.lat}</div>
-              <div><strong>Longitude:</strong> {userLocation.lng}</div>
+            {/* Modal header */}
+            <div className={`flex items-center justify-between px-6 py-4 border-b flex-shrink-0 ${border}`}>
+              <h2 className={`text-lg font-semibold ${textMain}`}>Hospital Wait Times</h2>
+              <button
+                onClick={() => setShowHospitalModal(false)}
+                className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors duration-150 ${dm ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-black/5 text-gray-400'}`}
+                aria-label="Close"
+              >
+                <CloseIcon />
+              </button>
             </div>
-          ) : (
-            <div>Location not available.</div>
-          )}
-            <button
-              onClick={() => setShowHospitalModal(false)}
-              style={{
-                alignSelf: "flex-end",
-                background: darkMode ? "#0f172a" : "#fff",
-                color: darkMode ? "#fff" : "#222",
-                border: "none",
-                borderRadius: "8px",
-                padding: "8px 12px",
-                fontSize: "1rem",
-                cursor: "pointer",
-                marginBottom: "16px"
-              }}>
-              Close
-            </button>
-          <h2 style={{ marginBottom: "24px" }}>Hospital Wait Times</h2>
-          {/* Transform waitTimes to WaitTimeMenu format and add distance */}
-          <WaitTimeMenu
-            hospitals={waitTimes.map(h => {
-              // Convert waitTimeMinutes to "xh ym" format
-              let waitTimeStr = 'N/A';
-              if (h.waitTime && typeof h.waitTime.waitTimeMinutes === 'number') {
-                const mins = h.waitTime.waitTimeMinutes;
-                const hPart = Math.floor(mins / 60);
-                const mPart = mins % 60;
-                waitTimeStr = `${hPart > 0 ? hPart + 'h ' : ''}${mPart}m`;
-              }
-              return {
-                name: h.name,
-                address: h.address,
-                city: h.city || h.region || '',
-                waitTime: waitTimeStr,
-                updated: h.waitTime?.createdAt ? `Updated ${new Date(h.waitTime.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Updated just now',
-                note: h.notes || h.openStatus || h.description || '',
-                distance: userLocation ? getDistance(userLocation.lat, userLocation.lng, h.latitude, h.longitude).toFixed(2) + ' km' : undefined
-              };
-            })}
-            onGetDirections={(hospital) => {
-              window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hospital.address + ' ' + hospital.city)}`);
-            }}
-          />
+            {/* Modal body */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <WaitTimeMenu
+                hospitals={waitTimes.map(formatHospitalForMenu)}
+                onGetDirections={hospital => {
+                  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hospital.address + ' ' + hospital.city)}`);
+                }}
+              />
+            </div>
+          </div>
         </div>
       )}
-  </div>
+    </div>
   );
 };
-
 
 export default App;

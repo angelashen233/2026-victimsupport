@@ -8,6 +8,7 @@ export interface Message {
   text: string;
   image?: string;
   quickReplies?: string[];
+  timestamp?: string;
 }
 
 export interface UserProfile {

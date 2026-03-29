@@ -100,11 +100,6 @@ export const generateResources = async (ai: GoogleGenAI, messages: Message[], us
         contact: "https://victimlinkbc.ca/"
       },
       {
-        name: "Salal Sexual Violence Support Centre (SVSC)",
-        description: "Provides support, advocacy, and counseling for survivors of sexual violence in Greater Vancouver.",
-        contact: "https://www.salalsvsc.ca/"
-      },
-      {
         name: "Ending Violence BC Services Directory",
         description: "Comprehensive directory of anti-violence services and support organizations in British Columbia.",
         contact: "https://endingviolence.org/services-directory/"
@@ -113,12 +108,60 @@ export const generateResources = async (ai: GoogleGenAI, messages: Message[], us
         name: "Ending Violence Canada Sexual Assault Centres & Crisis Lines",
         description: "National directory of sexual assault centres, crisis lines, and support services across Canada.",
         contact: "https://endingviolencecanada.org/sexual-assault-centres-crisis-lines-and-support-services/"
+      },
+      {
+        name: "Surrey Women's Centre",
+        description: "Support services for women in Surrey including crisis intervention, counseling, and advocacy.",
+        contact: "https://www.surreywomenscentre.ca/"
+      },
+      {
+        name: "Vancouver Rape Relief & Women's Shelter",
+        description: "Transition house and rape crisis services for women and children fleeing violence in Vancouver.",
+        contact: "https://www.rapereliefshelter.bc.ca/"
+      },
+      {
+        name: "Tri-City Transitions",
+        description: "Transition house providing emergency shelter and support for women and children fleeing abuse in Coquitlam, Port Coquitlam, and Port Moody.",
+        contact: "https://www.tricitytransitions.ca/"
       }
     ];
 
     // Check if user is in Greater Vancouver
     const locationStr = userProfile.location?.toLowerCase() || "";
     const isVancouver = locationStr.includes("vancouver") || locationStr.includes("burnaby") || locationStr.includes("richmond") || locationStr.includes("surrey") || locationStr.includes("coquitlam") || locationStr.includes("new westminster") || locationStr.includes("delta") || locationStr.includes("langley") || locationStr.includes("north vancouver") || locationStr.includes("west vancouver");
+
+    // UBC proximity: Point Grey, UBC, Kitsilano, West Point Grey area
+    const isNearUBC = locationStr.includes("ubc") || locationStr.includes("point grey") || locationStr.includes("kitsilano") || locationStr.includes("west point grey");
+
+    // SFU proximity: Burnaby Mountain, SFU, Simon Fraser
+    const isNearSFU = locationStr.includes("sfu") || locationStr.includes("simon fraser") || locationStr.includes("burnaby mountain");
+
+    // Student-related keywords in conversation context
+    const chatLower = chatHistory.toLowerCase();
+    const mentionsUBC = chatLower.includes("ubc") || chatLower.includes("university of british columbia");
+    const mentionsSFU = chatLower.includes("sfu") || chatLower.includes("simon fraser");
+    const mentionsStudent = chatLower.includes("student") || chatLower.includes("campus") || chatLower.includes("university") || chatLower.includes("college");
+
+    const ubcResources: Resource[] = [
+      {
+        name: "Salal Sexual Violence Support Centre (SVSC)",
+        description: "Provides support, advocacy, and counseling for survivors of sexual violence in Greater Vancouver, including support for UBC community members.",
+        contact: "https://www.salalsvsc.ca/"
+      },
+      {
+        name: "AMS Sexual Assault Support Centre (SASC) — UBC",
+        description: "Free, confidential support for UBC students affected by sexual violence. Offers crisis support, advocacy, and referrals. Run by the AMS student society.",
+        contact: "https://www.ams.ubc.ca/support-services/sasc/"
+      }
+    ];
+
+    const sfuResources: Resource[] = [
+      {
+        name: "Sexual Violence Support & Prevention Office — SFU",
+        description: "Free support for SFU students affected by sexual violence or harassment. After an initial intake interview, students can access free ongoing counseling. Provides confidential advocacy and resources.",
+        contact: "https://www.sfu.ca/sexual-violence-support.html"
+      }
+    ];
 
     const prompt = `
 User Profile Context:
@@ -145,8 +188,20 @@ ${chatHistory}`;
         const parsedJson = JSON.parse(jsonString);
         let resources: Resource[] = parsedJson.resources || [];
         if (isVancouver) {
-          // Prepend Vancouver resources, remove duplicates by name
-          const allResources = [...vancouverResources, ...resources];
+          const contextResources: Resource[] = [...vancouverResources];
+
+          // Add UBC resources if near UBC campus or user mentions UBC/being a student
+          if (isNearUBC || mentionsUBC || ((isNearSFU || mentionsSFU) === false && mentionsStudent)) {
+            contextResources.push(...ubcResources);
+          }
+
+          // Add SFU resources if near SFU or user mentions SFU
+          if (isNearSFU || mentionsSFU) {
+            contextResources.push(...sfuResources);
+          }
+
+          // Prepend context resources, remove duplicates by name
+          const allResources = [...contextResources, ...resources];
           const seen = new Set<string>();
           resources = allResources.filter(r => {
             if (seen.has(r.name)) return false;
