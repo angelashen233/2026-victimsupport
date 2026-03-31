@@ -87,58 +87,89 @@ interface ChatScreenProps {
     onInitialPromptSent?: () => void;
 }
 
-// Helper for formatting standard text (bold, links)
+// Helper for formatting standard text (bold, links, phone numbers)
 const formatRegularText = (text: string): React.ReactNode[] => {
-  if (!text) {
-    return [text];
-  }
+  if (!text) return [text];
 
-  // Regex to split by markdown-like bold (*text*) and links ([text](url))
-  const regex = /(\*.*?\*)|(\[.*?\]\(.*?\))/g;
+  // Split by bold, markdown links, and phone numbers
+  const regex = /(\*.*?\*)|(\[.*?\]\(.*?\))|((?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}|1-\d{3}-\d{3}-\d{4}|\d{3}-\d{4})/g;
   const parts = text.split(regex).filter(part => part);
 
   return parts.map((part, index) => {
-    // Check for bold text: *text*
+    // Bold: *text*
     if (part.startsWith('*') && part.endsWith('*')) {
       return <strong key={index}>{part.slice(1, -1)}</strong>;
     }
-    // Check for links: [text](url)
+    // Markdown link: [text](url)
     if (part.startsWith('[') && part.includes('](') && part.endsWith(')')) {
       const linkTextMatch = part.match(/\[(.*?)\]/);
       const urlMatch = part.match(/\((.*?)\)/);
-
       if (linkTextMatch && urlMatch) {
-        const linkText = linkTextMatch[1];
-        const url = urlMatch[1];
         return (
-          <a
-            key={index}
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sky-400 hover:underline"
-          >
-            {linkText}
+          <a key={index} href={urlMatch[1]} target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline">
+            {linkTextMatch[1]}
           </a>
         );
       }
     }
-    // Plain text
+    // Phone number — render as a callable button
+    if (/^(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}$|^1-\d{3}-\d{3}-\d{4}$|^\d{3}-\d{4}$/.test(part.trim())) {
+      const digits = part.replace(/\D/g, '');
+      const tel = digits.length === 7 ? `+1604${digits}` : `+${digits.length === 10 ? '1' : ''}${digits}`;
+      return (
+        <a
+          key={index}
+          href={`tel:${tel}`}
+          className="inline-flex items-center gap-1 px-2 py-0.5 mx-0.5 rounded-full text-xs font-semibold bg-sky-700/50 text-sky-300 hover:bg-sky-600/60 border border-sky-600/50 transition-colors"
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.68A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z"/>
+          </svg>
+          {part.trim()}
+        </a>
+      );
+    }
     return part;
   });
 };
 
 
-// Helper function to format message text, now handling collapsible sections
+// Helper function to format message text, now handling collapsible sections and map embeds
 const formatMessageText = (text: string): React.ReactNode => {
     if (!text) {
       return text;
     }
-    const collapsibleRegex = /(\[COLLAPSIBLE_START\][\s\S]*?\[COLLAPSIBLE_END\])/g;
-    const parts = text.split(collapsibleRegex).filter(part => part);
+    // Strip any [QUICK_REPLIES: ...] tags that weren't removed during parsing
+    text = text.replace(/\[QUICK_REPLIES:\s*.*?\]/gs, '').trim();
+    const segmentRegex = /(\[MAP_EMBED:[^\]]+\]|\[COLLAPSIBLE_START\][\s\S]*?\[COLLAPSIBLE_END\])/g;
+    const parts = text.split(segmentRegex).filter(part => part);
 
     return parts.map((part, index) => {
-        if (part.startsWith('[COLLAPSIBLE_START]')) {
+        if (part.startsWith('[MAP_EMBED:')) {
+            const query = part.replace('[MAP_EMBED:', '').replace(']', '').trim();
+            const src = `https://maps.google.com/maps?q=${encodeURIComponent(query)}&output=embed`;
+            return (
+                <div key={index} className="my-3 rounded-lg overflow-hidden border border-slate-600">
+                    <iframe
+                        src={src}
+                        width="100%"
+                        height="220"
+                        style={{ border: 0 }}
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                        title={`Map: ${query}`}
+                    />
+                    <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block px-3 py-1.5 text-xs text-sky-400 hover:text-sky-300 bg-slate-800 text-center"
+                    >
+                        Open in Google Maps ↗
+                    </a>
+                </div>
+            );
+        } else if (part.startsWith('[COLLAPSIBLE_START]')) {
             const content = part.replace('[COLLAPSIBLE_START]', '').replace('[COLLAPSIBLE_END]', '').trim();
             const lines = content.split('\n');
             const title = lines.shift() || 'View Resources';
@@ -183,6 +214,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [quickRepliesExpanded, setQuickRepliesExpanded] = useState(false);
+  const [pinnedResource, setPinnedResource] = useState<{ name: string; phone: string; website?: string } | null>(null);
 
   const handleDownloadConversation = () => {
     const now = new Date();
@@ -283,36 +315,28 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       
         let responseText: string;
 
-        // The manager agent only runs if it's currently the active agent.
-        // Subsequent turns are handled by the agent the manager delegated to.
-        if (activeAgent === 'manager') {
-            if (!chats.manager) throw new Error("Manager agent not initialized.");
-            const routerResult = await chats.manager.sendMessage({ message: parts });
-            const route = routerResult.text.trim();
+        // Always run the manager first to route every message to the right agent.
+        if (!chats.manager) throw new Error("Manager agent not initialized.");
+        const routerResult = await chats.manager.sendMessage({ message: parts });
+        const route = (routerResult.text ?? '').trim();
 
-            let nextAgent: AgentType = 'offtopic';
-            let nextAgentChat: Chat | null = chats.offtopic;
+        let nextAgent: AgentType = 'info';
+        let nextAgentChat: Chat | null = chats.info;
 
-            if (route.includes('[INFO]')) {
-                nextAgent = 'info';
-                nextAgentChat = chats.info;
-            } else if (route.includes('[LOCATION]')) {
-                nextAgent = 'location';
-                nextAgentChat = chats.location;
-            }
-            
-            setActiveAgent(nextAgent);
-
-            if (!nextAgentChat) throw new Error(`${nextAgent} agent not initialized.`);
-            const agentResponse = await nextAgentChat.sendMessage({ message: parts });
-            responseText = agentResponse.text;
-        } else {
-            // Use the currently active agent for the conversation
-            const currentChat = chats[activeAgent];
-            if (!currentChat) throw new Error(`Active agent "${activeAgent}" not initialized.`);
-            const response = await currentChat.sendMessage({ message: parts });
-            responseText = response.text;
+        if (route.includes('[MAP]') || route.includes('[LOCATION]')) {
+            nextAgent = 'location';
+            nextAgentChat = chats.location ?? chats.info;
+        } else if (route.includes('[OFFTOPIC]')) {
+            nextAgent = 'offtopic';
+            nextAgentChat = chats.offtopic ?? chats.info;
         }
+        // [INFO], [DOCS], and anything unrecognized all go to info
+
+        setActiveAgent(nextAgent);
+
+        if (!nextAgentChat) throw new Error(`No agent available — all chat refs are null. Check API key and initialization.`);
+        const agentResponse = await nextAgentChat.sendMessage({ message: parts });
+        responseText = agentResponse.text ?? '';
       
         // Parse for quick replies
         const quickReplyRegex = /\[QUICK_REPLIES:\s*(.*?)\]/s;
@@ -321,21 +345,30 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         let cleanText = responseText;
 
         if (match && match[1]) {
+            cleanText = responseText.replace(quickReplyRegex, '').trim();
             try {
-                // The match is a string that looks like an array, so we parse it
                 quickReplies = JSON.parse(`[${match[1]}]`);
-                cleanText = responseText.replace(quickReplyRegex, '').trim();
             } catch (e) {
                 console.error("Failed to parse quick replies:", e);
-                // Leave text as is if parsing fails
             }
+        }
+
+        // Parse for pinned resource
+        const pinRegex = /\[PIN_RESOURCE:\s*({.*?})\]/s;
+        const pinMatch = cleanText.match(pinRegex);
+        if (pinMatch) {
+            try {
+                const pinData = JSON.parse(pinMatch[1]);
+                if (pinData.name && pinData.phone) setPinnedResource(pinData);
+            } catch {}
+            cleanText = cleanText.replace(pinRegex, '').trim();
         }
         
         const aiMessage: Message = { author: MessageAuthor.AI, text: cleanText, quickReplies, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
         setMessages(prev => [...prev, aiMessage]);
-    } catch (e) {
-        console.error(e);
-        setError("I'm sorry, I couldn't process that. Please try again.");
+    } catch (e: any) {
+        console.error("sendMessageToAI error:", e);
+        setError(`Error: ${e?.message ?? String(e)}`);
     } finally {
         setIsThinking(false);
         setIsWriting(false);
@@ -739,6 +772,51 @@ ${VOICE_PROMPT}
                 )}
         <div ref={messagesEndRef} />
       </div>
+
+      {pinnedResource && (
+        <div className="mx-4 mb-2 px-4 py-3 rounded-xl bg-sky-900/60 border border-sky-600/60 backdrop-blur-sm flex items-start gap-3 shadow-lg">
+          <div className="flex-shrink-0 mt-0.5">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-sky-400">
+              <path d="M12 2a7 7 0 017 7c0 5.25-7 13-7 13S5 14.25 5 9a7 7 0 017-7z"/>
+              <circle cx="12" cy="9" r="2.5" fill="white"/>
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-sky-300 uppercase tracking-wide mb-0.5">Top Resource</p>
+            <p className="text-sm font-medium text-white truncate">{pinnedResource.name}</p>
+            <div className="flex flex-wrap gap-2 mt-1.5">
+              <a
+                href={`tel:${pinnedResource.phone.replace(/\D/g, '')}`}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-700/60 text-sky-200 hover:bg-sky-600/70 border border-sky-500/50 transition-colors"
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81a19.79 19.79 0 01-3.07-8.68A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z"/>
+                </svg>
+                {pinnedResource.phone}
+              </a>
+              {pinnedResource.website && (
+                <a
+                  href={pinnedResource.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-700/60 text-slate-300 hover:bg-slate-600/70 border border-slate-500/50 transition-colors"
+                >
+                  Website ↗
+                </a>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => setPinnedResource(null)}
+            className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="Dismiss"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="px-4 py-2 mx-4 mb-2 text-sm text-center text-red-300 bg-red-900/30 border border-red-800/50 rounded-md">

@@ -141,13 +141,14 @@ const App: React.FC = () => {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  // ── Nearest hospitals ──────────────────────────────────────
-  const nearestHospitals = userLocation && waitTimes.length > 0
+  // ── Nearest hospitals (used by sidebar AND injected into chat) ────────────
+  const allHospitalsSorted = userLocation && waitTimes.length > 0
     ? [...waitTimes]
-        .map(h => ({ hospital: h, dist: getDistance(userLocation.lat, userLocation.lng, h.latitude, h.longitude) }))
+        .map(h => ({ hospital: h, dist: parseFloat(getDistance(userLocation.lat, userLocation.lng, h.latitude, h.longitude).toFixed(2)) }))
         .sort((a, b) => a.dist - b.dist)
-        .slice(0, 2)
     : [];
+
+  const nearestHospitals = allHospitalsSorted.slice(0, 2);
 
   // ── Start chat ─────────────────────────────────────────────
   const handleStartChat = useCallback((prompt?: string) => {
@@ -156,26 +157,50 @@ const App: React.FC = () => {
       return;
     }
     if (prompt) setInitialPrompt(prompt);
-    let hospitalData: any[] = [];
+    // Use the already-computed sorted hospital list from the sidebar — no re-sorting needed
+    const hospitalData = allHospitalsSorted.map(({ hospital: h, dist }) => ({
+      name: h.name,
+      address: h.address,
+      phone: h.phone ?? null,
+      website: h.website ?? null,
+      distanceKm: dist,
+      waitTimeMinutes: h.waitTime?.waitTimeMinutes ?? null,
+      open247: !!h.open247,
+    }));
+
+    let victimSupportData: any[] = [];
     try {
-      const stored = localStorage.getItem('hospital_wait_times');
-      if (stored) {
-        hospitalData = JSON.parse(stored).map((h: any) => ({
-          name: h.name, address: h.address,
-          latitude: h.latitude, longitude: h.longitude,
-          waitTime: h.waitTime?.waitTimeMinutes ?? null,
-          open247: !!h.open247,
-        }));
-      }
-    } catch (e) { console.error('Failed to load hospital data:', e); }
+      const stored = localStorage.getItem('victim_support_resources');
+      if (stored) victimSupportData = JSON.parse(stored);
+    } catch (e) { console.error('Failed to load victim support data:', e); }
+
+    // Pre-sort victim support resources by distance (province-wide resources with null lat go last)
+    if (userLocation && victimSupportData.length > 0) {
+      victimSupportData = victimSupportData
+        .map((r: any) => ({
+          ...r,
+          distanceKm: (r.lat != null && r.lng != null)
+            ? parseFloat(getDistance(userLocation.lat, userLocation.lng, r.lat, r.lng).toFixed(2))
+            : null,
+        }))
+        .sort((a: any, b: any) => {
+          if (a.distanceKm === null) return 1;
+          if (b.distanceKm === null) return -1;
+          return a.distanceKm - b.distanceKm;
+        });
+    }
 
     const hospitalSummary = hospitalData.length > 0
-      ? '\n---\nHOSPITAL DATA (JSON):\n' + JSON.stringify(hospitalData, null, 2) + '\n---'
+      ? '\n---\nHOSPITALS (pre-sorted nearest first, index 0 = closest). Use index 0 as the primary recommendation:\n' + JSON.stringify(hospitalData, null, 2) + '\n---'
+      : '';
+
+    const victimSupportSummary = victimSupportData.length > 0
+      ? '\n---\nVICTIM SUPPORT RESOURCES (pre-sorted nearest first, distanceKm=null means province-wide):\n' + JSON.stringify(victimSupportData, null, 2) + '\n---'
       : '';
 
     try {
       const userProfileWithHospitals = { ...userProfile, hospitalData };
-      const prepend = (base: string) => `${hospitalSummary}\n${base}`;
+      const prepend = (base: string) => `${hospitalSummary}${victimSupportSummary}\n${base}`;
       managerChatRef.current  = createAgent(aiRef.current, prepend(MANAGER_PROMPT),  userProfileWithHospitals);
       infoChatRef.current     = createAgent(aiRef.current, prepend(INFO_PROMPT),     userProfileWithHospitals);
       locationChatRef.current = createAgent(aiRef.current, prepend(LOCATION_PROMPT), userProfileWithHospitals);
@@ -193,7 +218,7 @@ const App: React.FC = () => {
       console.error(e);
       setError('Could not initialize the AI assistant. Please check your API key and refresh the page.');
     }
-  }, [userProfile]);
+  }, [userProfile, allHospitalsSorted, userLocation]);
 
   // ── Generate report ────────────────────────────────────────
   const handleGenerateReport = useCallback(async () => {
