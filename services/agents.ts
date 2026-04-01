@@ -25,7 +25,9 @@ import type { UserProfile } from "../types";
 //
 // GREATER VANCOUVER / SURREY
 //   Surrey Women's Centre                  https://www.surreywomenscentre.ca/
-//   Vancouver Rape Relief & Women's Shelter https://www.rapereliefshelter.bc.ca/
+//   Vancouver Rape Relief & Women's Shelter — 24hr crisis line
+//     Crisis: 604-872-8212 | https://rapereliefshelter.bc.ca/
+//     Note: group therapy services are not inclusive of trans women — list as lower option
 //   Battered Women's Support Services (BWSS) — Mon–Fri 10am–5pm, Wed to 8pm
 //     Crisis: 604-687-1867 | Toll-free: 1-855-687-1868 | https://bwss.org/
 //   Salal Sexual Violence Support Centre — 24hr crisis line
@@ -153,6 +155,7 @@ Listener mode — when someone wants to be heard, not advised:
   • RAINN Online Hotline (U.S.-based, available to anyone): rainn.org/get-help — chat available 24/7
   • BC Crisis Centre Chat (adults, noon–1am): crisiscentrechat.ca
   • VictimLink BC — confidential support and referrals (24/7): 1-800-563-0808
+  • Vancouver Rape Relief & Women's Shelter — 24hr crisis line: 604-872-8212 | rapereliefshelter.bc.ca (note: group therapy services are not inclusive of trans women)
   I can also help you document what you've shared, if you'd like a record for yourself or for reporting later.
   [COLLAPSIBLE_END]
 - Always make clear: talking to this AI is a starting point. A real human listener is available if they want one.

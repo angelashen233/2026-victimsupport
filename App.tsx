@@ -317,6 +317,7 @@ const App: React.FC = () => {
             setIsWriting={setIsWriting}
             initialPrompt={initialPrompt}
             onInitialPromptSent={() => setInitialPrompt(null)}
+            darkMode={darkMode}
           />
         );
       case 'report':

@@ -85,6 +85,7 @@ interface ChatScreenProps {
     setIsWriting: React.Dispatch<React.SetStateAction<boolean>>;
     initialPrompt?: string | null;
     onInitialPromptSent?: () => void;
+    darkMode?: boolean;
 }
 
 // Helper for formatting standard text (bold, links, phone numbers)
@@ -176,9 +177,9 @@ const formatMessageText = (text: string): React.ReactNode => {
             const body = lines.join('\n');
 
             return (
-                <details key={index} className="my-2 p-3 border rounded-lg bg-slate-800/50 border-slate-600">
+                <details key={index} className="chat-collapsible my-2 p-3 border rounded-lg">
                     <summary className="cursor-pointer font-semibold text-sky-400">{title}</summary>
-                    <div className="mt-2 pt-2 border-t border-slate-500 whitespace-pre-wrap">
+                    <div className="mt-2 pt-2 border-t whitespace-pre-wrap chat-collapsible-body">
                         {formatRegularText(body)}
                     </div>
                 </details>
@@ -208,7 +209,25 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     setIsWriting,
     initialPrompt,
     onInitialPromptSent,
+    darkMode = true,
 }) => {
+  const dm = darkMode;
+
+  // Mode-aware class helpers
+  const msgBubbleAI   = dm ? 'bg-slate-700 text-slate-200 border border-slate-600' : 'bg-white text-gray-900 border border-gray-200';
+  const msgBubbleUser = 'bg-sky-600 text-white';
+  const surfacePanel  = dm ? 'bg-slate-800' : 'bg-white';
+  const surfaceInput  = dm ? 'bg-slate-700/80 border-slate-600/80 text-slate-200 placeholder-slate-500' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400';
+  const surfaceMenu   = dm ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200';
+  const menuItem      = dm ? 'text-slate-200 hover:bg-slate-600' : 'text-gray-800 hover:bg-gray-100';
+  const iconBtn       = dm ? 'text-slate-300 bg-slate-700 hover:bg-slate-600' : 'text-gray-600 bg-gray-100 hover:bg-gray-200';
+  const avatarAI      = dm ? 'bg-sky-900 text-sky-400' : 'bg-sky-100 text-sky-600';
+  const avatarUser    = dm ? 'bg-slate-600 text-slate-300' : 'bg-gray-200 text-gray-600';
+  const errorBar      = 'bg-red-900/60 text-red-300 border border-red-700/50';
+  const collapsible   = dm ? 'bg-slate-800/50 border-slate-600 text-slate-200' : 'bg-gray-50 border-gray-300 text-gray-900';
+  const collapsibleDivider = dm ? 'border-slate-500' : 'border-gray-300';
+  const quickReplyBtn = dm ? 'bg-slate-700/60 text-slate-300 hover:bg-slate-600/70 border-slate-500/50' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300';
+
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [showActionMenu, setShowActionMenu] = useState(false);
@@ -712,7 +731,30 @@ ${VOICE_PROMPT}
   const quickReplies = lastMessage?.author === MessageAuthor.AI && lastMessage.quickReplies && lastMessage.quickReplies.length > 0 ? lastMessage.quickReplies : null;
 
   return (
-    <div className="flex flex-col h-full max-w-3xl mx-auto bg-slate-900/60 backdrop-blur-sm w-full">
+    <div
+      data-theme={dm ? 'dark' : 'light'}
+      className={`flex flex-col h-full max-w-3xl mx-auto backdrop-blur-sm w-full ${dm ? 'bg-slate-900/60' : 'bg-white/80'}`}
+    >
+      <style>{`
+        [data-theme="light"] .chat-collapsible {
+          background: rgba(249,250,251,1);
+          border-color: #d1d5db;
+          color: #111827;
+        }
+        [data-theme="light"] .chat-collapsible-body {
+          border-color: #d1d5db;
+          color: #111827;
+        }
+        [data-theme="dark"] .chat-collapsible {
+          background: rgba(30,41,59,0.5);
+          border-color: #475569;
+          color: #e2e8f0;
+        }
+        [data-theme="dark"] .chat-collapsible-body {
+          border-color: #64748b;
+          color: #e2e8f0;
+        }
+      `}</style>
       {showCamera && <CameraModal />}
       {showRecorder && <RecorderModal />}
       {showResources && <ResourcesModal />}
@@ -721,18 +763,18 @@ ${VOICE_PROMPT}
         {messages.map((msg, index) => (
           <div key={index} className={`flex items-start gap-3 ${msg.author === MessageAuthor.USER ? 'justify-end' : 'justify-start'}`}>
             {msg.author === MessageAuthor.AI && (
-              <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-sky-900 rounded-full text-sky-400">
+              <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full ${avatarAI}`}>
                 <BotIcon />
               </div>
             )}
-            <div className={`max-w-xl px-4 py-3 rounded-2xl ${msg.author === MessageAuthor.USER 
-                ? 'bg-sky-600 text-white rounded-br-none' 
-                : 'bg-slate-700 text-slate-200 border border-slate-600 rounded-bl-none'}`}>
+            <div className={`max-w-xl px-4 py-3 rounded-2xl ${msg.author === MessageAuthor.USER
+                ? `${msgBubbleUser} rounded-br-none`
+                : `${msgBubbleAI} rounded-bl-none`}`}>
               {msg.image && <img src={msg.image} alt="User upload" className="object-cover w-full mb-2 rounded-lg max-h-64" />}
               {msg.text && <div className="whitespace-pre-wrap">{formatMessageText(msg.text)}</div>}
             </div>
              {msg.author === MessageAuthor.USER && (
-                <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-600 rounded-full text-slate-300">
+                <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full ${avatarUser}`}>
                     <UserIcon />
                 </div>
             )}
@@ -743,30 +785,30 @@ ${VOICE_PROMPT}
                 <div className={`max-w-xl px-4 py-3 rounded-2xl bg-sky-600 text-white rounded-br-none`}>
                     <div className="whitespace-pre-wrap">{streamingInput}</div>
                 </div>
-                <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-600 rounded-full text-slate-300">
+                <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full ${avatarUser}`}>
                     <UserIcon />
                 </div>
             </div>
         )}
         {streamingOutput && (
             <div className="flex items-start gap-3 justify-start">
-                <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-sky-900 rounded-full text-sky-400">
+                <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full ${avatarAI}`}>
                     <BotIcon />
                 </div>
-                <div className={`max-w-xl px-4 py-3 rounded-2xl bg-slate-700 text-slate-200 border border-slate-600 rounded-bl-none`}>
+                <div className={`max-w-xl px-4 py-3 rounded-2xl rounded-bl-none ${msgBubbleAI}`}>
                     <div className="whitespace-pre-wrap">{streamingOutput}</div>
                 </div>
             </div>
         )}
                 {(isThinking || isWriting) && (
                     <div className="flex items-start gap-3 justify-start">
-                        <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-sky-900 rounded-full text-sky-400">
+                        <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full ${avatarAI}`}>
                                 <BotIcon />
                         </div>
-                        <div className="flex items-center space-x-1 max-w-xl px-4 py-3 rounded-2xl bg-slate-700 border border-slate-600 rounded-bl-none">
-                            <span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse [animation-delay:-0.3s]"></span>
-                            <span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse [animation-delay:-0.15s]"></span>
-                            <span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse"></span>
+                        <div className={`flex items-center space-x-1 max-w-xl px-4 py-3 rounded-2xl rounded-bl-none ${msgBubbleAI}`}>
+                            <span className={`w-2 h-2 rounded-full animate-pulse [animation-delay:-0.3s] ${dm ? 'bg-slate-400' : 'bg-gray-400'}`}></span>
+                            <span className={`w-2 h-2 rounded-full animate-pulse [animation-delay:-0.15s] ${dm ? 'bg-slate-400' : 'bg-gray-400'}`}></span>
+                            <span className={`w-2 h-2 rounded-full animate-pulse ${dm ? 'bg-slate-400' : 'bg-gray-400'}`}></span>
                         </div>
                     </div>
                 )}
@@ -819,17 +861,17 @@ ${VOICE_PROMPT}
       )}
 
       {error && (
-        <div className="px-4 py-2 mx-4 mb-2 text-sm text-center text-red-300 bg-red-900/30 border border-red-800/50 rounded-md">
+        <div className={`px-4 py-2 mx-4 mb-2 text-sm text-center rounded-md ${errorBar}`}>
           {error}
         </div>
       )}
 
-      <div className="px-4 pt-3 pb-4 bg-slate-800/90 border-t border-slate-700/70 backdrop-blur-sm">
+      <div className={`px-4 pt-3 pb-4 border-t backdrop-blur-sm ${dm ? 'bg-slate-800/90 border-slate-700/70' : 'bg-white/90 border-gray-200'}`}>
          {quickReplies && !streamingInput && !streamingOutput && (
-            <div className="pb-3 mb-3 border-b border-slate-700">
+            <div className={`pb-3 mb-3 border-b ${dm ? 'border-slate-700' : 'border-gray-200'}`}>
                 <button
                     onClick={() => setQuickRepliesExpanded(prev => !prev)}
-                    className="flex items-center gap-1 mb-2 text-xs font-medium text-slate-400 hover:text-slate-200 sm:hidden"
+                    className={`flex items-center gap-1 mb-2 text-xs font-medium sm:hidden ${dm ? 'text-slate-400 hover:text-slate-200' : 'text-gray-500 hover:text-gray-800'}`}
                 >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: quickRepliesExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
                         <polyline points="6 9 12 15 18 9" />
@@ -842,7 +884,7 @@ ${VOICE_PROMPT}
                             key={index}
                             onClick={() => handleQuickReplyClick(reply)}
                             disabled={isThinking}
-                            className="px-4 py-2 text-sm font-medium transition-colors duration-200 border rounded-full text-sky-300 bg-sky-900/50 border-sky-800 hover:bg-sky-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className={`px-4 py-2 text-sm font-medium transition-colors duration-200 border rounded-full disabled:opacity-50 disabled:cursor-not-allowed ${dm ? 'text-sky-300 bg-sky-900/50 border-sky-800 hover:bg-sky-900' : 'text-sky-700 bg-sky-50 border-sky-200 hover:bg-sky-100'}`}
                         >
                             {reply}
                         </button>
@@ -861,7 +903,7 @@ ${VOICE_PROMPT}
                 <button 
                 onClick={() => setShowExportMenu(prev => !prev)}
                 disabled={isGeneratingReport || isGeneratingResources || messages.length < 2}
-                className="flex items-center justify-center flex-shrink-0 w-12 h-12 text-slate-300 bg-slate-700 rounded-full hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`flex items-center justify-center flex-shrink-0 w-12 h-12 rounded-full disabled:opacity-50 disabled:cursor-not-allowed ${iconBtn}`}
                 title="Actions Menu"
                 >
                 {(isGeneratingReport || isGeneratingResources) ? (
@@ -871,10 +913,10 @@ ${VOICE_PROMPT}
                 )}
                 </button>
                 {showExportMenu && (
-                    <div ref={exportMenuRef} className="absolute bottom-full left-0 z-10 w-64 mb-2 overflow-hidden bg-slate-700 border rounded-lg shadow-lg border-slate-600">
-                        <button onClick={() => { setShowExportMenu(false); onGenerateReport(); }} className="flex items-center w-full gap-3 px-4 py-3 text-sm font-medium text-left text-slate-200 hover:bg-slate-600"><GenerateReportIcon /> File an Incident Report</button>
-                        <button onClick={() => { setShowExportMenu(false); onGenerateResources(); }} className="flex items-center w-full gap-3 px-4 py-3 text-sm font-medium text-left text-slate-200 hover:bg-slate-600"><ResourcesIcon /> Compile Resources</button>
-                        <button onClick={() => { setShowExportMenu(false); handleDownloadConversation(); }} className="flex items-center w-full gap-3 px-4 py-3 text-sm font-medium text-left text-slate-200 hover:bg-slate-600"><DownloadIcon /> Save Conversation</button>
+                    <div ref={exportMenuRef} className={`absolute bottom-full left-0 z-10 w-64 mb-2 overflow-hidden border rounded-lg shadow-lg ${surfaceMenu}`}>
+                        <button onClick={() => { setShowExportMenu(false); onGenerateReport(); }} className={`flex items-center w-full gap-3 px-4 py-3 text-sm font-medium text-left ${menuItem}`}><GenerateReportIcon /> File an Incident Report</button>
+                        <button onClick={() => { setShowExportMenu(false); onGenerateResources(); }} className={`flex items-center w-full gap-3 px-4 py-3 text-sm font-medium text-left ${menuItem}`}><ResourcesIcon /> Compile Resources</button>
+                        <button onClick={() => { setShowExportMenu(false); handleDownloadConversation(); }} className={`flex items-center w-full gap-3 px-4 py-3 text-sm font-medium text-left ${menuItem}`}><DownloadIcon /> Save Conversation</button>
                     </div>
                 )}
             </div>
@@ -885,10 +927,10 @@ ${VOICE_PROMPT}
                     <AttachmentIcon />
                 </button>
                 {showActionMenu && (
-                     <div ref={actionMenuRef} className="absolute bottom-full left-0 mb-2 w-48 bg-slate-700 border border-slate-600 rounded-lg shadow-lg overflow-hidden">
-                        <button onClick={() => { setShowActionMenu(false); setShowResources(true); }} className="flex items-center w-full gap-3 px-4 py-2 text-left text-slate-200 hover:bg-slate-600"><ResourcesIcon /> Resources</button>
-                        <button onClick={openCamera} className="flex items-center w-full gap-3 px-4 py-2 text-left text-slate-200 hover:bg-slate-600"><CameraIcon /> Take Photo</button>
-                        <button onClick={() => { setShowActionMenu(false); setShowRecorder(true); }} className="flex items-center w-full gap-3 px-4 py-2 text-left text-slate-200 hover:bg-slate-600"><AudioIcon /> Record Audio</button>
+                     <div ref={actionMenuRef} className={`absolute bottom-full left-0 mb-2 w-48 border rounded-lg shadow-lg overflow-hidden ${surfaceMenu}`}>
+                        <button onClick={() => { setShowActionMenu(false); setShowResources(true); }} className={`flex items-center w-full gap-3 px-4 py-2 text-left ${menuItem}`}><ResourcesIcon /> Resources</button>
+                        <button onClick={openCamera} className={`flex items-center w-full gap-3 px-4 py-2 text-left ${menuItem}`}><CameraIcon /> Take Photo</button>
+                        <button onClick={() => { setShowActionMenu(false); setShowRecorder(true); }} className={`flex items-center w-full gap-3 px-4 py-2 text-left ${menuItem}`}><AudioIcon /> Record Audio</button>
                     </div>
                 )}
             </div>
@@ -904,7 +946,7 @@ ${VOICE_PROMPT}
               }}
               placeholder="Message Safe Harbor..."
               rows={1}
-              className="w-full px-12 py-3 pr-24 text-sm text-slate-200 placeholder-slate-500 transition-colors duration-150 border rounded-2xl resize-none bg-slate-700/80 border-slate-600/80 focus:outline-none focus:ring-2 focus:ring-sky-500/70 focus:border-sky-500/50"
+              className={`w-full px-12 py-3 pr-24 text-sm transition-colors duration-150 border rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-sky-500/70 focus:border-sky-500/50 ${surfaceInput}`}
             />
             <div className="absolute inset-y-0 right-0 flex items-center pr-1">
                 <button
