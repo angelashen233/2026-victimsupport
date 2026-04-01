@@ -237,10 +237,10 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
   const handleDownloadConversation = () => {
     const now = new Date();
-    const header = `Safe Harbor Conversation\nExported: ${now.toLocaleString()}\n${'─'.repeat(40)}\n\n`;
+    const header = `Afterhour Resources Conversation\nExported: ${now.toLocaleString()}\n${'─'.repeat(40)}\n\n`;
     const text = header + messages
       .map(m => {
-        const speaker = m.author === MessageAuthor.USER ? 'You' : 'Safe Harbor';
+        const speaker = m.author === MessageAuthor.USER ? 'You' : 'Afterhour Resources';
         const ts = m.timestamp ? ` [${m.timestamp}]` : '';
         return `${speaker}${ts}:\n${m.text}`;
       })
@@ -944,7 +944,7 @@ ${VOICE_PROMPT}
                   handleSend();
                 }
               }}
-              placeholder="Message Safe Harbor..."
+              placeholder="Message Afterhour Resources..."
               rows={1}
               className={`w-full px-12 py-3 pr-24 text-sm transition-colors duration-150 border rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-sky-500/70 focus:border-sky-500/50 ${surfaceInput}`}
             />

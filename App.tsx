@@ -390,7 +390,7 @@ const App: React.FC = () => {
 
         {/* Title */}
         <span className={`font-semibold text-[15px] tracking-tight select-none ${textMain}`}>
-          Safe Harbor
+          Afterhour Resources
         </span>
 
         {/* Exit */}
