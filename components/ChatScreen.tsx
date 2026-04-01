@@ -884,7 +884,7 @@ ${VOICE_PROMPT}
                             key={index}
                             onClick={() => handleQuickReplyClick(reply)}
                             disabled={isThinking}
-                            className={`px-4 py-2 text-sm font-medium transition-colors duration-200 border rounded-full disabled:opacity-50 disabled:cursor-not-allowed ${dm ? 'text-sky-300 bg-sky-900/50 border-sky-800 hover:bg-sky-900' : 'text-sky-700 bg-sky-50 border-sky-200 hover:bg-sky-100'}`}
+                            className={`px-4 py-2 text-sm font-medium transition-colors duration-200 border rounded-full disabled:opacity-50 disabled:cursor-not-allowed ${dm ? 'text-sky-300 bg-sky-900/50 border-sky-800 hover:bg-sky-900' : 'text-blue-900 bg-white border-blue-800 hover:bg-blue-50'}`}
                         >
                             {reply}
                         </button>
