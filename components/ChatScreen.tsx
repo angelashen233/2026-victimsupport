@@ -825,7 +825,7 @@ ${VOICE_PROMPT}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-sky-300 uppercase tracking-wide mb-0.5">Top Resource</p>
-            <p className="text-sm font-medium text-white truncate">{pinnedResource.name}</p>
+            <p className={`text-sm font-medium truncate ${dm ? 'text-white' : 'text-gray-900'}`}>{pinnedResource.name}</p>
             <div className="flex flex-wrap gap-2 mt-1.5">
               <a
                 href={`tel:${pinnedResource.phone.replace(/\D/g, '')}`}
@@ -841,7 +841,7 @@ ${VOICE_PROMPT}
                   href={pinnedResource.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-700/60 text-slate-300 hover:bg-slate-600/70 border border-slate-500/50 transition-colors"
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors border ${dm ? 'bg-slate-700/60 text-slate-300 hover:bg-slate-600/70 border-slate-500/50' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300'}`}
                 >
                   Website ↗
                 </a>
@@ -850,7 +850,7 @@ ${VOICE_PROMPT}
           </div>
           <button
             onClick={() => setPinnedResource(null)}
-            className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            className={`flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full transition-colors ${dm ? 'text-slate-400 hover:text-white hover:bg-white/10' : 'text-gray-400 hover:text-gray-700 hover:bg-black/8'}`}
             aria-label="Dismiss"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

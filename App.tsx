@@ -6,6 +6,7 @@ import DisclaimerScreen from './components/DisclaimerScreen';
 import { ExternalLinkIcon } from './components/icons';
 import ReportScreen from './components/ReportScreen';
 import ResourcesScreen from './components/ResourcesScreen';
+import TutorialOverlay from './components/TutorialOverlay';
 import WaitTimeMenu from './components/WaitTimeMenu';
 import { initialUserProfile } from './data/userProfile';
 import { createAgent, INFO_PROMPT, LOCATION_PROMPT, MANAGER_PROMPT, OFFTOPIC_PROMPT } from './services/agents';
@@ -44,6 +45,7 @@ const App: React.FC = () => {
   const [showMap, setShowMap]                       = useState(false);
   const [darkMode, setDarkMode]                     = useState(true);
   const [initialPrompt, setInitialPrompt]           = useState<string | null>(null);
+  const [showTutorial, setShowTutorial]             = useState(false);
 
   // ── Refs ─────────────────────────────────────────────────
   const aiRef           = useRef<GoogleGenAI | null>(null);
@@ -120,6 +122,18 @@ const App: React.FC = () => {
       );
     }
   }, []);
+
+  // ── Auto-show tutorial on first visit ─────────────────────
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem('tutorial_seen')) setShowTutorial(true);
+    } catch {}
+  }, []);
+
+  const handleCloseTutorial = () => {
+    setShowTutorial(false);
+    try { localStorage.setItem('tutorial_seen', '1'); } catch {}
+  };
 
   // ── Background image per mode ──────────────────────────────
   useEffect(() => {
@@ -290,6 +304,7 @@ const App: React.FC = () => {
             onAccept={() => handleStartChat()}
             onSelectPrompt={(prompt) => handleStartChat(prompt)}
             error={error}
+            darkMode={darkMode}
           />
         );
       case 'chat':
@@ -328,6 +343,7 @@ const App: React.FC = () => {
               recipients={recipients}
               onBackToChat={handleBackToChat}
               onStartOver={handleStartOver}
+              darkMode={darkMode}
             />
           </div>
         );
@@ -338,6 +354,7 @@ const App: React.FC = () => {
               resources={resources}
               onBackToChat={handleBackToChat}
               onStartOver={handleStartOver}
+              darkMode={darkMode}
             />
           </div>
         );
@@ -347,6 +364,7 @@ const App: React.FC = () => {
             onAccept={() => handleStartChat()}
             onSelectPrompt={(prompt) => handleStartChat(prompt)}
             error={error}
+            darkMode={darkMode}
           />
         );
     }
@@ -378,6 +396,7 @@ const App: React.FC = () => {
         {/* Hamburger */}
         <button
           onClick={() => setIsMenuOpen(true)}
+          data-tutorial="menu-btn"
           className={`w-10 h-10 flex items-center justify-center rounded-xl transition-colors duration-150 ${dm ? 'text-slate-300 hover:bg-white/8' : 'text-gray-600 hover:bg-black/5'}`}
           aria-label="Open menu"
         >
@@ -396,6 +415,7 @@ const App: React.FC = () => {
         {/* Exit */}
         <button
           onClick={() => window.location.href = 'https://google.com'}
+          data-tutorial="exit-btn"
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 active:bg-red-800 rounded-lg transition-colors duration-150 shadow-sm"
           aria-label="Exit to safety"
         >
@@ -538,6 +558,19 @@ const App: React.FC = () => {
             <span className="font-medium">{dm ? 'Light Mode' : 'Dark Mode'}</span>
           </button>
 
+          {/* ── Take a Tour ────────────────────────────── */}
+          <button
+            onClick={() => { setShowTutorial(true); setIsMenuOpen(false); }}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl transition-colors duration-150 ${textMain} ${rowHover}`}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-sky-400">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <span className="font-medium">Take a Tour</span>
+          </button>
+
           {/* Divider */}
           <div className={`my-1.5 h-px mx-1 ${dm ? 'bg-slate-700/60' : 'bg-gray-100'}`} />
 
@@ -601,6 +634,16 @@ const App: React.FC = () => {
       {/* ══════════════════════════════════════════════════════
           HOSPITAL WAIT TIMES MODAL
       ══════════════════════════════════════════════════════ */}
+      {/* ══════════════════════════════════════════════════════
+          TUTORIAL OVERLAY
+      ══════════════════════════════════════════════════════ */}
+      <TutorialOverlay
+        isOpen={showTutorial}
+        onClose={handleCloseTutorial}
+        darkMode={darkMode}
+      />
+
+
       {showHospitalModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm modal-overlay opacity-100"
@@ -629,6 +672,7 @@ const App: React.FC = () => {
                 onGetDirections={hospital => {
                   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hospital.address + ' ' + hospital.city)}`);
                 }}
+                darkMode={darkMode}
               />
             </div>
           </div>

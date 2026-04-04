@@ -8,16 +8,18 @@ interface ReportScreenProps {
   recipients: Recipient[] | null;
   onBackToChat: () => void;
   onStartOver: () => void;
+  darkMode?: boolean;
 }
 
-const ReportSection: React.FC<{ title: string; content: string | undefined }> = ({ title, content }) => (
+const ReportSection: React.FC<{ title: string; content: string | undefined; dm?: boolean }> = ({ title, content, dm = true }) => (
   <div>
-    <h3 className="text-sm font-semibold tracking-wider uppercase text-slate-400">{title}</h3>
-    <p className="mt-1 text-base text-slate-300 whitespace-pre-wrap">{content || 'Not specified'}</p>
+    <h3 className={`text-sm font-semibold tracking-wider uppercase ${dm ? 'text-slate-400' : 'text-gray-500'}`}>{title}</h3>
+    <p className={`mt-1 text-base whitespace-pre-wrap ${dm ? 'text-slate-300' : 'text-gray-800'}`}>{content || 'Not specified'}</p>
   </div>
 );
 
-const ReportScreen: React.FC<ReportScreenProps> = ({ reportData, recipients, onBackToChat, onStartOver }) => {
+const ReportScreen: React.FC<ReportScreenProps> = ({ reportData, recipients, onBackToChat, onStartOver, darkMode = true }) => {
+  const dm = darkMode;
   const [copied, setCopied] = useState(false);
 
   // Helper: Only include fields that are filled
@@ -54,8 +56,8 @@ const ReportScreen: React.FC<ReportScreenProps> = ({ reportData, recipients, onB
   if (!reportData || !recipients) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-        <h2 className="text-2xl font-bold">Could not generate report.</h2>
-        <p className="mt-2 text-slate-400">Something went wrong. Please go back and try again.</p>
+        <h2 className={`text-2xl font-bold ${dm ? 'text-slate-100' : 'text-gray-900'}`}>Could not generate report.</h2>
+        <p className={`mt-2 ${dm ? 'text-slate-400' : 'text-gray-600'}`}>Something went wrong. Please go back and try again.</p>
         <button
           onClick={onBackToChat}
           className="flex items-center gap-2 px-4 py-2 mt-6 text-sm font-medium text-white transition-colors duration-200 bg-sky-600 rounded-md hover:bg-sky-700"
@@ -84,50 +86,50 @@ const ReportScreen: React.FC<ReportScreenProps> = ({ reportData, recipients, onB
   };
 
   return (
-    <div className="max-w-4xl p-4 mx-auto my-8 bg-slate-900/50 backdrop-blur-sm md:p-8">
-        <div className="p-8 bg-slate-800/50 border rounded-lg shadow-lg border-slate-700">
+    <div className={`max-w-4xl p-4 mx-auto my-8 backdrop-blur-sm md:p-8 ${dm ? 'bg-slate-900/50' : 'bg-white/70'}`}>
+        <div className={`p-8 border rounded-lg shadow-lg ${dm ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-gray-200'}`}>
       <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-        <h2 className="text-2xl font-bold text-slate-100">Conversation Summary &amp; Report Draft</h2>
+        <h2 className={`text-2xl font-bold ${dm ? 'text-slate-100' : 'text-gray-900'}`}>Conversation Summary &amp; Report Draft</h2>
         <div className="flex gap-2">
           <button
             onClick={handleCopyToClipboard}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 rounded-md bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 focus:ring-offset-slate-800"
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium text-white transition-colors duration-200 rounded-md bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 ${dm ? 'focus:ring-offset-slate-800' : 'focus:ring-offset-white'}`}
           >
             {copied ? <CheckIcon /> : <CopyIcon />}
             <span>{copied ? 'Copied!' : 'Copy Text'}</span>
           </button>
         </div>
       </div>
-            <p className="mt-2 text-sm text-slate-400">
+            <p className={`mt-2 text-sm ${dm ? 'text-slate-400' : 'text-gray-600'}`}>
                 This is a draft based on your conversation. Only mentioned information is included. Please review for accuracy before sharing.
             </p>
-            <div className="mt-6 space-y-6 border-t border-slate-600 pt-6">
+            <div className={`mt-6 space-y-6 border-t pt-6 ${dm ? 'border-slate-600' : 'border-gray-200'}`}>
                 {/* Summary */}
                 <div className="mb-4">
-                  <h3 className="text-lg font-semibold text-slate-200">Summary</h3>
-                  <pre className="mt-2 text-base text-slate-300 whitespace-pre-wrap">{getSummary()}</pre>
+                  <h3 className={`text-lg font-semibold ${dm ? 'text-slate-200' : 'text-gray-900'}`}>Summary</h3>
+                  <pre className={`mt-2 text-base whitespace-pre-wrap ${dm ? 'text-slate-300' : 'text-gray-800'}`}>{getSummary()}</pre>
                 </div>
                 {/* Only show filled fields */}
                 {getFilledFields().map((f, idx) => (
-                  <ReportSection key={idx} title={f.label} content={f.value} />
+                  <ReportSection key={idx} title={f.label} content={f.value} dm={dm} />
                 ))}
             </div>
         </div>
 
-    <div className="p-8 mt-8 bg-slate-800/50 border rounded-lg shadow-lg border-slate-700">
-      <h2 className="text-2xl font-bold text-slate-100">Suggested Recipients</h2>
-      <p className="mt-2 text-sm text-slate-400">
+    <div className={`p-8 mt-8 border rounded-lg shadow-lg ${dm ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-gray-200'}`}>
+      <h2 className={`text-2xl font-bold ${dm ? 'text-slate-100' : 'text-gray-900'}`}>Suggested Recipients</h2>
+      <p className={`mt-2 text-sm ${dm ? 'text-slate-400' : 'text-gray-600'}`}>
         Depending on your situation, you might consider sharing this report with one of the following. This is not exhaustive and is not legal advice.
       </p>
       <ul className="mt-6 space-y-4">
         {recipients.map((recipient, index) => (
-          <li key={index} className="p-4 border rounded-md bg-slate-700/50 border-slate-700 flex flex-col md:flex-row md:items-center md:justify-between">
+          <li key={index} className={`p-4 border rounded-md flex flex-col md:flex-row md:items-center md:justify-between ${dm ? 'bg-slate-700/50 border-slate-700' : 'bg-gray-50 border-gray-200'}`}>
             <div>
-              <h3 className="font-semibold text-sky-400">{recipient.name}</h3>
-              <p className="mt-1 text-sm text-slate-300">{recipient.description}</p>
+              <h3 className="font-semibold text-sky-500">{recipient.name}</h3>
+              <p className={`mt-1 text-sm ${dm ? 'text-slate-300' : 'text-gray-700'}`}>{recipient.description}</p>
             </div>
             <button
-              className="mt-2 md:mt-0 flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-sky-700 rounded-md hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 focus:ring-offset-slate-800"
+              className={`mt-2 md:mt-0 flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-sky-700 rounded-md hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 ${dm ? 'focus:ring-offset-slate-800' : 'focus:ring-offset-white'}`}
               onClick={() => handleRecipientEmail(recipient)}
             >
               <EmailIcon />
@@ -137,13 +139,13 @@ const ReportScreen: React.FC<ReportScreenProps> = ({ reportData, recipients, onB
         ))}
       </ul>
     </div>
-        
+
         <div className="flex flex-col gap-4 mt-8 md:flex-row">
-            <button onClick={onBackToChat} className="flex items-center justify-center w-full gap-2 px-4 py-3 font-medium text-center transition-colors duration-200 border rounded-md shadow-sm text-slate-200 bg-slate-700 border-slate-600 hover:bg-slate-600">
+            <button onClick={onBackToChat} className={`flex items-center justify-center w-full gap-2 px-4 py-3 font-medium text-center transition-colors duration-200 border rounded-md shadow-sm ${dm ? 'text-slate-200 bg-slate-700 border-slate-600 hover:bg-slate-600' : 'text-gray-800 bg-gray-100 border-gray-300 hover:bg-gray-200'}`}>
                 <BackIcon />
                 <span>Back to Chat</span>
             </button>
-            <button onClick={onStartOver} className="flex items-center justify-center w-full gap-2 px-4 py-3 font-medium text-center transition-colors duration-200 bg-red-900/40 border border-red-800/60 rounded-md shadow-sm text-red-300 hover:bg-red-900/60">
+            <button onClick={onStartOver} className={`flex items-center justify-center w-full gap-2 px-4 py-3 font-medium text-center transition-colors duration-200 border rounded-md shadow-sm ${dm ? 'bg-red-900/40 border-red-800/60 text-red-300 hover:bg-red-900/60' : 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100'}`}>
                 <RedoIcon />
                 <span>Start New Session</span>
             </button>
