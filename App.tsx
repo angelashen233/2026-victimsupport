@@ -393,17 +393,42 @@ const App: React.FC = () => {
         className={`flex-shrink-0 flex items-center justify-between px-3 sm:px-4 z-30 border-b backdrop-blur-md ${surface}/80 ${border}`}
         style={{ height: '56px' }}
       >
-        {/* Hamburger */}
+        {/* Hamburger → X */}
         <button
-          onClick={() => setIsMenuOpen(true)}
+          onClick={() => setIsMenuOpen(prev => !prev)}
           data-tutorial="menu-btn"
           className={`w-10 h-10 flex items-center justify-center rounded-xl transition-colors duration-150 ${dm ? 'text-slate-300 hover:bg-white/8' : 'text-gray-600 hover:bg-black/5'}`}
-          aria-label="Open menu"
+          aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="3" y1="6"  x2="21" y2="6"  />
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="18" x2="21" y2="18" />
+            {/* Top bar → rotates to form top of X */}
+            <line
+              x1="3" y1="6" x2="21" y2="6"
+              style={{
+                transformOrigin: '12px 12px',
+                transform: isMenuOpen ? 'translateY(6px) rotate(45deg)' : 'translateY(0) rotate(0deg)',
+                transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
+              }}
+            />
+            {/* Middle bar → fades out */}
+            <line
+              x1="3" y1="12" x2="21" y2="12"
+              style={{
+                transformOrigin: '12px 12px',
+                opacity: isMenuOpen ? 0 : 1,
+                transform: isMenuOpen ? 'scaleX(0.3)' : 'scaleX(1)',
+                transition: 'opacity 0.18s ease, transform 0.22s cubic-bezier(0.4,0,0.2,1)',
+              }}
+            />
+            {/* Bottom bar → rotates to form bottom of X */}
+            <line
+              x1="3" y1="18" x2="21" y2="18"
+              style={{
+                transformOrigin: '12px 12px',
+                transform: isMenuOpen ? 'translateY(-6px) rotate(-45deg)' : 'translateY(0) rotate(0deg)',
+                transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
+              }}
+            />
           </svg>
         </button>
 
@@ -442,149 +467,215 @@ const App: React.FC = () => {
           SIDEBAR DRAWER
       ══════════════════════════════════════════════════════ */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex flex-col shadow-2xl sidebar-drawer border-r ${surface} ${border} ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
-        style={{ width: '280px' }}
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col shadow-2xl sidebar-drawer ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{ width: '288px', background: dm ? '#0f172a' : '#fff' }}
       >
-        {/* Header */}
+        {/* ── Branded header ─────────────────────────────── */}
         <div
-          className={`flex items-center justify-between px-4 flex-shrink-0 border-b ${border}`}
-          style={{ height: '56px' }}
+          className="relative flex-shrink-0 px-5 pt-5 pb-4 overflow-hidden"
+          style={{
+            background: dm
+              ? 'linear-gradient(135deg, #0c4a6e 0%, #1e293b 60%)'
+              : 'linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 60%)',
+          }}
         >
-          <span className={`font-semibold text-[15px] ${textMain}`}>Menu</span>
-          <button
-            onClick={() => setIsMenuOpen(false)}
-            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors duration-150 ${dm ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-black/5 text-gray-500'}`}
-            aria-label="Close menu"
-          >
-            <CloseIcon />
-          </button>
+          {/* Decorative circle */}
+          <div
+            className="absolute -top-8 -right-8 w-32 h-32 rounded-full opacity-20"
+            style={{ background: dm ? '#38bdf8' : '#0ea5e9' }}
+          />
+          <div className="flex items-start justify-between relative">
+            <div>
+              <p className={`text-[11px] font-semibold uppercase tracking-widest mb-0.5 ${dm ? 'text-sky-400' : 'text-sky-600'}`}>
+                Safe Space
+              </p>
+              <h2 className={`text-lg font-bold leading-tight ${dm ? 'text-white' : 'text-sky-900'}`}>
+                Afterhour<br />Resources
+              </h2>
+              <p className={`text-xs mt-1.5 leading-snug ${dm ? 'text-sky-200/60' : 'text-sky-700/70'}`}>
+                Confidential · Judgment-free
+              </p>
+            </div>
+            <button
+              onClick={() => setIsMenuOpen(false)}
+              className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${dm ? 'text-white/50 hover:bg-white/10 hover:text-white' : 'text-sky-700/50 hover:bg-sky-900/10 hover:text-sky-900'}`}
+              aria-label="Close menu"
+            >
+              <CloseIcon />
+            </button>
+          </div>
         </div>
 
-        {/* Scroll area */}
-        <div className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
+        {/* ── Scroll area ────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
 
-          {/* ── Nearest Hospitals card ─────────────────────── */}
-          {nearestHospitals.length > 0 && (
-            <div className={`rounded-xl overflow-hidden mb-1 ${surface2} border ${border}`}>
-              <p className={`px-3 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider ${textMuted}`}>
-                Nearest Hospitals
-              </p>
-              {nearestHospitals.map((entry, idx) => {
-                const waitMins = entry.hospital.waitTime?.waitTimeMinutes;
-                let waitStr = 'N/A';
-                let waitColor = dm ? 'text-slate-400' : 'text-gray-400';
-                if (typeof waitMins === 'number') {
-                  const hr  = Math.floor(waitMins / 60);
-                  const min = waitMins % 60;
-                  waitStr   = hr > 0 ? `${hr}h ${min}m` : `${min}m`;
-                  waitColor = waitMins < 60 ? 'text-green-400' : 'text-yellow-400';
-                }
-                const mapUrl = `https://www.google.com/maps/search/?api=1&query=${entry.hospital.latitude},${entry.hospital.longitude}`;
-                return (
-                  <div key={idx} className={`px-3 py-2 ${idx > 0 ? `border-t ${border}` : ''}`}>
+          {/* ── Nearby section ─────────────────────────────── */}
+          {(nearestHospitals.length > 0 || userLocation) && (
+            <div>
+              <p className={`px-1 mb-1.5 text-[10px] font-bold uppercase tracking-widest ${textMuted}`}>Nearby</p>
+              <div className={`rounded-2xl overflow-hidden border ${dm ? 'bg-slate-800/70 border-slate-700/50' : 'bg-gray-50 border-gray-200'}`}>
+
+                {/* Hospital rows */}
+                {nearestHospitals.map((entry, idx) => {
+                  const waitMins = entry.hospital.waitTime?.waitTimeMinutes;
+                  let waitStr = 'N/A';
+                  let waitBadge = dm ? 'bg-slate-700 text-slate-400' : 'bg-gray-200 text-gray-500';
+                  if (typeof waitMins === 'number') {
+                    const hr  = Math.floor(waitMins / 60);
+                    const min = waitMins % 60;
+                    waitStr   = hr > 0 ? `${hr}h ${min}m` : `${min}m`;
+                    waitBadge = waitMins < 60
+                      ? 'bg-green-500/20 text-green-400'
+                      : 'bg-yellow-500/20 text-yellow-400';
+                  }
+                  const mapUrl = `https://www.google.com/maps/search/?api=1&query=${entry.hospital.latitude},${entry.hospital.longitude}`;
+                  return (
                     <a
+                      key={idx}
                       href={mapUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`text-sm font-medium leading-snug hover:underline ${dm ? 'text-sky-400' : 'text-blue-600'}`}
+                      className={`flex items-center gap-3 px-3 py-2.5 transition-colors ${idx > 0 ? `border-t ${border}` : ''} ${dm ? 'hover:bg-white/5' : 'hover:bg-black/3'}`}
                     >
-                      {entry.hospital.name}
+                      <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-rose-500/15 flex items-center justify-center">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-rose-400">
+                          <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium leading-snug truncate ${dm ? 'text-slate-200' : 'text-gray-800'}`}>{entry.hospital.name}</p>
+                        <p className={`text-xs mt-0.5 ${textMuted}`}>{entry.dist.toFixed(1)} km away</p>
+                      </div>
+                      <span className={`flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${waitBadge}`}>{waitStr}</span>
                     </a>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`text-xs font-semibold ${waitColor}`}>{waitStr}</span>
-                      <span className={`text-xs ${textMuted}`}>· {entry.dist.toFixed(1)} km</span>
+                  );
+                })}
+
+                {/* View all */}
+                {nearestHospitals.length > 0 && (
+                  <button
+                    onClick={() => { setShowHospitalModal(true); setIsMenuOpen(false); }}
+                    className={`w-full px-3 py-2 text-left text-xs font-semibold border-t transition-colors ${border} ${dm ? 'text-sky-400 hover:bg-white/5' : 'text-sky-600 hover:bg-sky-50'}`}
+                  >
+                    View all hospitals →
+                  </button>
+                )}
+
+                {/* Your location */}
+                {userLocation && (
+                  <button
+                    onClick={() => { setShowMap(true); setIsMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 transition-colors ${nearestHospitals.length > 0 ? `border-t ${border}` : ''} ${dm ? 'hover:bg-white/5' : 'hover:bg-black/3'}`}
+                  >
+                    <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-sky-500/15 flex items-center justify-center">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-sky-400">
+                        <path d="M21 10.5a8.38 8.38 0 01-1.9 5.4c-1.5 2-4.1 5.1-4.1 5.1a1.38 1.38 0 01-2 0s-2.6-3.1-4.1-5.1A8.38 8.38 0 013 10.5 7.5 7.5 0 0112 3a7.5 7.5 0 019 7.5z"/>
+                        <circle cx="12" cy="10.5" r="2.5"/>
+                      </svg>
                     </div>
-                  </div>
-                );
-              })}
-              <button
-                onClick={() => { setShowHospitalModal(true); setIsMenuOpen(false); }}
-                className={`w-full px-3 py-2 text-left text-xs font-medium border-t transition-colors duration-150 ${border} ${dm ? 'text-sky-400 hover:bg-white/6' : 'text-blue-600 hover:bg-black/4'}`}
-              >
-                View all hospitals →
-              </button>
+                    <div className="text-left min-w-0">
+                      <p className={`text-sm font-medium ${dm ? 'text-slate-200' : 'text-gray-800'}`}>Your Location</p>
+                      <p className={`text-xs mt-0.5 truncate ${textMuted}`}>{userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}</p>
+                    </div>
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
-          {/* ── Your Location ──────────────────────────────── */}
-          {userLocation && (
-            <button
-              onClick={() => { setShowMap(true); setIsMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl transition-colors duration-150 ${textMain} ${rowHover}`}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-sky-400">
-                <path d="M21 10.5a8.38 8.38 0 01-1.9 5.4c-1.5 2-4.1 5.1-4.1 5.1a1.38 1.38 0 01-2 0s-2.6-3.1-4.1-5.1A8.38 8.38 0 013 10.5 7.5 7.5 0 0112 3a7.5 7.5 0 019 7.5z" />
-                <circle cx="12" cy="10.5" r="2.5" />
-              </svg>
-              <div className="text-left min-w-0">
-                <div className="font-medium">Your Location</div>
-                <div className={`text-xs mt-0.5 truncate ${textMuted}`}>
-                  {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
+          {/* ── Support section ────────────────────────────── */}
+          <div>
+            <p className={`px-1 mb-1.5 text-[10px] font-bold uppercase tracking-widest ${textMuted}`}>Support</p>
+            <div className={`rounded-2xl overflow-hidden border ${dm ? 'bg-slate-800/70 border-slate-700/50' : 'bg-gray-50 border-gray-200'}`}>
+              <a
+                href="https://www.rainn.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsMenuOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 transition-colors ${dm ? 'hover:bg-white/5' : 'hover:bg-black/3'}`}
+              >
+                <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-violet-500/15 flex items-center justify-center">
+                  <ExternalLinkIcon className="text-violet-400" />
                 </div>
-              </div>
-            </button>
-          )}
+                <div className="text-left">
+                  <p className={`text-sm font-medium ${dm ? 'text-slate-200' : 'text-gray-800'}`}>RAINN.org</p>
+                  <p className={`text-xs ${textMuted}`}>24/7 online support chat</p>
+                </div>
+              </a>
 
-          {/* ── RAINN.org ──────────────────────────────────── */}
-          <a
-            href="https://www.rainn.org/"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => setIsMenuOpen(false)}
-            className={`flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl transition-colors duration-150 ${textMain} ${rowHover}`}
-          >
-            <ExternalLinkIcon className="flex-shrink-0 text-sky-400" />
-            <span className="font-medium">RAINN.org Support Chat</span>
-          </a>
+              <button
+                onClick={() => { setShowTutorial(true); setIsMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 transition-colors border-t ${border} ${dm ? 'hover:bg-white/5' : 'hover:bg-black/3'}`}
+              >
+                <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-indigo-500/15 flex items-center justify-center">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-400">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <p className={`text-sm font-medium ${dm ? 'text-slate-200' : 'text-gray-800'}`}>Take a Tour</p>
+                  <p className={`text-xs ${textMuted}`}>See how this app works</p>
+                </div>
+              </button>
+            </div>
+          </div>
 
-          {/* ── Dark / Light mode ──────────────────────────── */}
-          <button
-            onClick={() => setDarkMode(!dm)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl transition-colors duration-150 ${textMain} ${rowHover}`}
-          >
-            {dm ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-yellow-400">
-                <circle cx="12" cy="12" r="5" />
-                <line x1="12" y1="1"  x2="12" y2="3"  /><line x1="12" y1="21" x2="12" y2="23" />
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                <line x1="1"  y1="12" x2="3"  y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-              </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-slate-400">
-                <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z" />
-              </svg>
-            )}
-            <span className="font-medium">{dm ? 'Light Mode' : 'Dark Mode'}</span>
-          </button>
-
-          {/* ── Take a Tour ────────────────────────────── */}
-          <button
-            onClick={() => { setShowTutorial(true); setIsMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl transition-colors duration-150 ${textMain} ${rowHover}`}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-sky-400">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <span className="font-medium">Take a Tour</span>
-          </button>
-
-          {/* Divider */}
-          <div className={`my-1.5 h-px mx-1 ${dm ? 'bg-slate-700/60' : 'bg-gray-100'}`} />
+          {/* ── Preferences section ────────────────────────── */}
+          <div>
+            <p className={`px-1 mb-1.5 text-[10px] font-bold uppercase tracking-widest ${textMuted}`}>Preferences</p>
+            <div className={`rounded-2xl border ${dm ? 'bg-slate-800/70 border-slate-700/50' : 'bg-gray-50 border-gray-200'}`}>
+              <button
+                onClick={() => setDarkMode(!dm)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 transition-colors rounded-2xl ${dm ? 'hover:bg-white/5' : 'hover:bg-black/3'}`}
+              >
+                <div className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center ${dm ? 'bg-amber-500/15' : 'bg-slate-500/10'}`}>
+                  {dm ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-amber-400">
+                      <circle cx="12" cy="12" r="5"/>
+                      <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                      <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500">
+                      <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 109.79 9.79z"/>
+                    </svg>
+                  )}
+                </div>
+                <p className={`flex-1 text-sm font-medium text-left ${dm ? 'text-slate-200' : 'text-gray-800'}`}>
+                  {dm ? 'Light Mode' : 'Dark Mode'}
+                </p>
+                {/* Pill toggle */}
+                <div className={`relative flex-shrink-0 w-10 h-5.5 rounded-full transition-colors duration-200 ${dm ? 'bg-sky-500' : 'bg-gray-300'}`} style={{ height: '22px', width: '40px' }}>
+                  <div
+                    className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200"
+                    style={{ transform: dm ? 'translateX(20px)' : 'translateX(2px)' }}
+                  />
+                </div>
+              </button>
+            </div>
+          </div>
 
           {/* ── New Session ────────────────────────────────── */}
           <button
             onClick={() => { handleStartOver(); setIsMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm rounded-xl transition-colors duration-150 ${dm ? 'text-red-400 hover:bg-red-900/25' : 'text-red-500 hover:bg-red-50'}`}
+            className={`w-full flex items-center gap-3 px-3 py-3 rounded-2xl border text-left transition-colors ${dm ? 'bg-red-950/40 border-red-900/40 hover:bg-red-900/50' : 'bg-red-50 border-red-200 hover:bg-red-100'}`}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-              <polyline points="1 4 1 10 7 10" />
-              <path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
-            </svg>
-            <span className="font-medium">New Session</span>
+            <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-red-500/20 flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-red-400">
+                <polyline points="1 4 1 10 7 10"/>
+                <path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
+              </svg>
+            </div>
+            <div>
+              <p className={`text-sm font-semibold ${dm ? 'text-red-400' : 'text-red-600'}`}>New Session</p>
+              <p className={`text-xs mt-0.5 ${dm ? 'text-red-500/70' : 'text-red-400'}`}>Clears all chat history</p>
+            </div>
           </button>
+
         </div>
       </aside>
 
