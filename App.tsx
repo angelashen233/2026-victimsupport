@@ -139,8 +139,8 @@ const App: React.FC = () => {
   useEffect(() => {
     const body = document.body;
     body.style.backgroundImage = darkMode
-      ? "url('https://images.unsplash.com/photo-1508402476522-c77c2fa4479d?q=80&w=2070&auto=format&fit=crop')"
-      : "url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1500&q=80')";
+      ? "linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url('https://images.unsplash.com/photo-1508402476522-c77c2fa4479d?q=80&w=2070&auto=format&fit=crop')"
+      : "linear-gradient(rgba(255,255,255,0.45), rgba(255,255,255,0.45)), url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1500&q=80')";
     body.style.backgroundSize     = 'cover';
     body.style.backgroundPosition = 'center';
     body.style.color              = darkMode ? '#e2e8f0' : '#222';

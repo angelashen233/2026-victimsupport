@@ -29,22 +29,6 @@ const DisclaimerScreen: React.FC<DisclaimerScreenProps> = ({ onAccept, onSelectP
         </div>
       )}
 
-      {/* ── Suggested prompts ─────────────────────────── */}
-      <div data-tutorial="suggested-prompts" className="w-full space-y-2">
-        <p className={`text-[11px] font-semibold uppercase tracking-widest px-1 mb-3 ${dm ? 'text-white/40' : 'text-gray-700'}`}>
-          Suggested
-        </p>
-        {SUGGESTED_PROMPTS.map((prompt, i) => (
-          <button
-            key={i}
-            onClick={() => onSelectPrompt(prompt)}
-            className={`w-full text-left px-5 py-3 text-sm rounded-full transition-all duration-150 backdrop-blur-sm border ${dm ? 'text-white/80 hover:text-white bg-white/8 hover:bg-white/14 border-white/10 hover:border-white/25' : 'text-gray-900 hover:text-gray-900 bg-black/8 hover:bg-black/12 border-gray-900/15 hover:border-gray-900/30'}`}
-          >
-            {prompt}
-          </button>
-        ))}
-      </div>
-
       {/* ── Main CTA ──────────────────────────────────── */}
       <div className="w-full space-y-4 text-center">
         <h1
@@ -61,6 +45,22 @@ const DisclaimerScreen: React.FC<DisclaimerScreenProps> = ({ onAccept, onSelectP
           <span>Unsure if your experience was abusive or an assault?</span>
           <ChevronRightIcon className="transition-transform group-hover:translate-x-1 flex-shrink-0" />
         </button>
+      </div>
+
+      {/* ── Suggested prompts ─────────────────────────── */}
+      <div data-tutorial="suggested-prompts" className="w-full space-y-2">
+        <p className={`text-[11px] font-semibold uppercase tracking-widest px-1 mb-3 ${dm ? 'text-white/40' : 'text-gray-700'}`}>
+          Suggested
+        </p>
+        {SUGGESTED_PROMPTS.map((prompt, i) => (
+          <button
+            key={i}
+            onClick={() => onSelectPrompt(prompt)}
+            className={`w-full text-left px-5 py-3 text-sm rounded-full transition-all duration-150 backdrop-blur-sm border ${dm ? 'text-white/80 hover:text-white bg-white/8 hover:bg-white/14 border-white/10 hover:border-white/25' : 'text-gray-900 hover:text-gray-900 bg-black/8 hover:bg-black/12 border-gray-900/15 hover:border-gray-900/30'}`}
+          >
+            {prompt}
+          </button>
+        ))}
       </div>
     </div>
   );
