@@ -3,6 +3,7 @@ import { GoogleGenAI } from '@google/genai';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ChatScreen from './components/ChatScreen';
 import DisclaimerScreen from './components/DisclaimerScreen';
+import PrivacyPolicyScreen from './components/PrivacyPolicyScreen';
 import { ExternalLinkIcon } from './components/icons';
 import ReportScreen from './components/ReportScreen';
 import ResourcesScreen from './components/ResourcesScreen';
@@ -14,7 +15,7 @@ import { generateReport, generateResources } from './services/geminiService';
 import type { Message, Recipient, ReportData, Resource, UserProfile } from './types';
 import { MessageAuthor } from './types';
 
-type AppState = 'disclaimer' | 'chat' | 'report' | 'resources';
+type AppState = 'privacy' | 'disclaimer' | 'chat' | 'report' | 'resources';
 export type AgentType = 'manager' | 'info' | 'location' | 'offtopic';
 
 // ── Shared close icon ──────────────────────────────────────────────────────
@@ -27,7 +28,7 @@ const CloseIcon = () => (
 // ── App ────────────────────────────────────────────────────────────────────
 const App: React.FC = () => {
   // ── State ────────────────────────────────────────────────
-  const [appState, setAppState]                     = useState<AppState>('disclaimer');
+  const [appState, setAppState]                     = useState<AppState>('privacy');
   const [messages, setMessages]                     = useState<Message[]>([]);
   const [reportData, setReportData]                 = useState<ReportData | null>(null);
   const [recipients, setRecipients]                 = useState<Recipient[] | null>(null);
@@ -56,7 +57,7 @@ const App: React.FC = () => {
 
   // ── Reset ─────────────────────────────────────────────────
   const handleStartOver = () => {
-    setAppState('disclaimer');
+    setAppState('privacy');
     setMessages([]);
     setReportData(null);
     setRecipients(null);
@@ -298,6 +299,13 @@ const App: React.FC = () => {
   // ── Screen content ─────────────────────────────────────────
   const renderContent = () => {
     switch (appState) {
+      case 'privacy':
+        return (
+          <PrivacyPolicyScreen
+            onAccept={() => setAppState('disclaimer')}
+            darkMode={darkMode}
+          />
+        );
       case 'disclaimer':
         return (
           <DisclaimerScreen
@@ -360,10 +368,8 @@ const App: React.FC = () => {
         );
       default:
         return (
-          <DisclaimerScreen
-            onAccept={() => handleStartChat()}
-            onSelectPrompt={(prompt) => handleStartChat(prompt)}
-            error={error}
+          <PrivacyPolicyScreen
+            onAccept={() => setAppState('disclaimer')}
             darkMode={darkMode}
           />
         );
@@ -433,9 +439,12 @@ const App: React.FC = () => {
         </button>
 
         {/* Title */}
-        <span className={`font-semibold text-[15px] tracking-tight select-none ${textMain}`}>
-          Afterhour Resources
-        </span>
+        <div className="flex items-center gap-2">
+          <img src="/logo.png" alt="Afterhour Resources" className="w-7 h-7 rounded-md object-contain" />
+          <span className={`font-semibold text-[15px] tracking-tight select-none ${textMain}`}>
+            Afterhour Resources
+          </span>
+        </div>
 
         {/* Exit */}
         <button
@@ -486,9 +495,12 @@ const App: React.FC = () => {
           />
           <div className="flex items-start justify-between relative">
             <div>
-              <p className={`text-[11px] font-semibold uppercase tracking-widest mb-0.5 ${dm ? 'text-sky-400' : 'text-sky-600'}`}>
-                Safe Space
-              </p>
+              <div className="flex items-center gap-2 mb-1">
+                <img src="/logo.png" alt="" className="w-8 h-8 rounded-lg object-contain" />
+                <p className={`text-[11px] font-semibold uppercase tracking-widest ${dm ? 'text-sky-400' : 'text-sky-600'}`}>
+                  Safe Space
+                </p>
+              </div>
               <h2 className={`text-lg font-bold leading-tight ${dm ? 'text-white' : 'text-sky-900'}`}>
                 Afterhour<br />Resources
               </h2>
