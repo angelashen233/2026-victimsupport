@@ -96,7 +96,7 @@ const App: React.FC = () => {
       })
       .catch(e => console.error('Error fetching wait times:', e));
 
-    fetch('/info-data/victim_support.json')
+    fetch(`${import.meta.env.BASE_URL}info-data/victim_support.json`)
       .then(r => r.json())
       .then(data => {
         try { localStorage.setItem('victim_support_resources', JSON.stringify(data)); } catch {}
@@ -440,7 +440,7 @@ const App: React.FC = () => {
 
         {/* Title */}
         <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="Afterhour Resources" className="w-7 h-7 rounded-md object-contain" />
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Afterhour Resources" className="w-7 h-7 rounded-md object-contain" />
           <span className={`font-semibold text-[15px] tracking-tight select-none ${textMain}`}>
             Afterhour Resources
           </span>
@@ -496,7 +496,7 @@ const App: React.FC = () => {
           <div className="flex items-start justify-between relative">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <img src="/logo.png" alt="" className="w-8 h-8 rounded-lg object-contain" />
+                <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" className="w-8 h-8 rounded-lg object-contain" />
                 <p className={`text-[11px] font-semibold uppercase tracking-widest ${dm ? 'text-sky-400' : 'text-sky-600'}`}>
                   Safe Space
                 </p>
