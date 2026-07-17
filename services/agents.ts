@@ -1,5 +1,13 @@
 import { GoogleGenAI, Chat } from "@google/genai";
+import type { Content, Part } from "@google/genai";
 import type { UserProfile } from "../types";
+
+// Minimal structural interface both the real Gemini `Chat` and the local-model
+// fallback wrapper (services/ollamaChat.ts) satisfy, so callers don't need to
+// know which one they got.
+export interface ChatLike {
+  sendMessage(params: { message: Part[] }): Promise<{ text?: string }>;
+}
 
 // =============================================================================
 // REFERENCE: Partner Organizations & Support Resources
@@ -435,13 +443,11 @@ Operating principles:
 // Agent Factory
 
 /**
- * Creates a new chat instance with a specific system instruction and user context.
- * @param ai The GoogleGenAI instance.
- * @param basePrompt The base prompt for the agent.
- * @param userProfile The user's profile data.
- * @returns A new Chat instance.
+ * Composes the full system instruction (safety rules + user context + agent-specific
+ * prompt) shared by both the real Gemini agent and the local-model fallback, so the
+ * two backends are held to the same rules.
  */
-export const createAgent = (ai: GoogleGenAI, basePrompt: string, userProfile: UserProfile): Chat => {
+export const buildSystemInstruction = (basePrompt: string, userProfile: UserProfile): string => {
   const now = new Date();
   const chatTimestamp = now.toLocaleString("en-CA", {
     timeZone: "America/Vancouver",
@@ -464,13 +470,47 @@ Current date/time (Vancouver, PT): ${chatTimestamp}
 ---
   `.trim();
 
-  const systemInstruction = `${BASELINE_SAFETY_RULES}\n\n${contextHeader}\n\n${basePrompt}`;
+  return `${BASELINE_SAFETY_RULES}\n\n${contextHeader}\n\n${basePrompt}`;
+};
+
+/**
+ * Creates a new chat instance with a specific system instruction and user context.
+ * @param ai The GoogleGenAI instance.
+ * @param basePrompt The base prompt for the agent.
+ * @param userProfile The user's profile data.
+ * @returns A new Chat instance.
+ */
+export const createAgent = (ai: GoogleGenAI, basePrompt: string, userProfile: UserProfile): Chat => {
+  const systemInstruction = buildSystemInstruction(basePrompt, userProfile);
 
   return ai.chats.create({
-    model: "gemini-2.5-flash",
+    model: "gemini-2.5-flash-lite",
     config: {
       systemInstruction,
       temperature: 0.3,
     },
+  });
+};
+
+/**
+ * Same as createAgent, but seeds the chat with prior conversation turns.
+ * Used when the local-model fallback (services/ollamaChat.ts) has to hand a
+ * mid-conversation session over to Gemini and needs Gemini to have the context.
+ */
+export const createAgentWithHistory = (
+  ai: GoogleGenAI,
+  basePrompt: string,
+  userProfile: UserProfile,
+  history: Content[],
+): Chat => {
+  const systemInstruction = buildSystemInstruction(basePrompt, userProfile);
+
+  return ai.chats.create({
+    model: "gemini-2.5-flash-lite",
+    config: {
+      systemInstruction,
+      temperature: 0.3,
+    },
+    history,
   });
 };

@@ -3,10 +3,11 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { Message, UserProfile } from '../types';
 import { MessageAuthor } from '../types';
 // FIX: Removed 'LiveSession' which is not an exported member, and aliased 'Blob' to 'GenAIBlob' to avoid conflict with the native DOM Blob type.
-import type { Chat, Part, LiveServerMessage, Blob as GenAIBlob, GoogleGenAI } from '@google/genai';
+import type { Part, LiveServerMessage, Blob as GenAIBlob, GoogleGenAI } from '@google/genai';
 import { Modality } from '@google/genai';
 import { GenerateReportIcon, SendIcon, UserIcon, BotIcon, AttachmentIcon, CameraIcon, AudioIcon, ResourcesIcon, CompileIcon, MicrophoneIcon, DownloadIcon } from './icons';
 import type { AgentType } from '../App';
+import type { ChatLike } from '../services/agents';
 import { VOICE_PROMPT } from '../services/agents';
 
 // Voice Chat Audio Helpers
@@ -68,10 +69,10 @@ interface ChatScreenProps {
     messages: Message[];
     setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
     chats: {
-        manager: Chat | null;
-        info: Chat | null;
-        location: Chat | null;
-        offtopic: Chat | null;
+        manager: ChatLike | null;
+        info: ChatLike | null;
+        location: ChatLike | null;
+        offtopic: ChatLike | null;
     };
     activeAgent: AgentType;
     setActiveAgent: React.Dispatch<React.SetStateAction<AgentType>>;
@@ -324,7 +325,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         const route = (routerResult.text ?? '').trim();
 
         let nextAgent: AgentType = 'info';
-        let nextAgentChat: Chat | null = chats.info;
+        let nextAgentChat: ChatLike | null = chats.info;
 
         if (route.includes('[MAP]') || route.includes('[LOCATION]')) {
             nextAgent = 'location';

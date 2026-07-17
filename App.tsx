@@ -1,4 +1,3 @@
-import type { Chat } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ChatScreen from './components/ChatScreen';
@@ -10,8 +9,10 @@ import ResourcesScreen from './components/ResourcesScreen';
 import TutorialOverlay from './components/TutorialOverlay';
 import WaitTimeMenu from './components/WaitTimeMenu';
 import { initialUserProfile } from './data/userProfile';
-import { createAgent, INFO_PROMPT, LOCATION_PROMPT, MANAGER_PROMPT, OFFTOPIC_PROMPT } from './services/agents';
+import type { ChatLike } from './services/agents';
+import { buildSystemInstruction, createAgent, createAgentWithHistory, INFO_PROMPT, LOCATION_PROMPT, MANAGER_PROMPT, OFFTOPIC_PROMPT } from './services/agents';
 import { generateReport, generateResources } from './services/geminiService';
+import { createHybridAgent, isOllamaAvailable, OLLAMA_MODEL } from './services/ollamaChat';
 import type { Message, Recipient, ReportData, Resource, UserProfile } from './types';
 import { MessageAuthor } from './types';
 
@@ -50,10 +51,12 @@ const App: React.FC = () => {
 
   // ── Refs ─────────────────────────────────────────────────
   const aiRef           = useRef<GoogleGenAI | null>(null);
-  const managerChatRef  = useRef<Chat | null>(null);
-  const infoChatRef     = useRef<Chat | null>(null);
-  const locationChatRef = useRef<Chat | null>(null);
-  const offTopicChatRef = useRef<Chat | null>(null);
+  const managerChatRef  = useRef<ChatLike | null>(null);
+  const infoChatRef     = useRef<ChatLike | null>(null);
+  const locationChatRef = useRef<ChatLike | null>(null);
+  const offTopicChatRef = useRef<ChatLike | null>(null);
+  // Dev-only: true once we've confirmed a local Ollama server is reachable.
+  const useLocalModelRef = useRef(false);
 
   // ── Reset ─────────────────────────────────────────────────
   const handleStartOver = () => {
@@ -86,15 +89,33 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // ── Dev-only: prefer a local Ollama model over Gemini if one is running ───
+  // Never runs in production builds — deployed users have no local model to
+  // reach, so they always use Gemini directly.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    isOllamaAvailable().then(available => {
+      useLocalModelRef.current = available;
+      if (available) console.info(`Local model detected — using Ollama (${OLLAMA_MODEL}) with Gemini fallback.`);
+    });
+  }, []);
+
   // ── Fetch hospital data + resources ───────────────────────
   useEffect(() => {
-    fetch('https://edwaittimes.ca/api/wait-times')
+    const waitTimesUrl = import.meta.env.VITE_WAIT_TIMES_API_URL || 'https://edwaittimes.ca/api/wait-times';
+    fetch(waitTimesUrl)
       .then(r => r.json())
       .then(data => {
         setWaitTimes(data);
         try { localStorage.setItem('hospital_wait_times', JSON.stringify(data)); } catch {}
       })
-      .catch(e => console.error('Error fetching wait times:', e));
+      .catch(e => {
+        console.error('Error fetching wait times:', e);
+        try {
+          const cached = localStorage.getItem('hospital_wait_times');
+          if (cached) setWaitTimes(JSON.parse(cached));
+        } catch {}
+      });
 
     fetch(`${import.meta.env.BASE_URL}info-data/victim_support.json`)
       .then(r => r.json())
@@ -216,10 +237,23 @@ const App: React.FC = () => {
     try {
       const userProfileWithHospitals = { ...userProfile, hospitalData };
       const prepend = (base: string) => `${hospitalSummary}${victimSupportSummary}\n${base}`;
-      managerChatRef.current  = createAgent(aiRef.current, prepend(MANAGER_PROMPT),  userProfileWithHospitals);
-      infoChatRef.current     = createAgent(aiRef.current, prepend(INFO_PROMPT),     userProfileWithHospitals);
-      locationChatRef.current = createAgent(aiRef.current, prepend(LOCATION_PROMPT), userProfileWithHospitals);
-      offTopicChatRef.current = createAgent(aiRef.current, prepend(OFFTOPIC_PROMPT), userProfileWithHospitals);
+      const ai = aiRef.current;
+
+      // Dev-only: route through the local Ollama model, falling back to Gemini
+      // mid-session if it's unavailable or errors. See services/ollamaChat.ts.
+      const makeAgent = (basePrompt: string): ChatLike => {
+        const prompt = prepend(basePrompt);
+        if (!useLocalModelRef.current) return createAgent(ai, prompt, userProfileWithHospitals);
+        return createHybridAgent(
+          buildSystemInstruction(prompt, userProfileWithHospitals),
+          history => createAgentWithHistory(ai, prompt, userProfileWithHospitals, history),
+        );
+      };
+
+      managerChatRef.current  = makeAgent(MANAGER_PROMPT);
+      infoChatRef.current     = makeAgent(INFO_PROMPT);
+      locationChatRef.current = makeAgent(LOCATION_PROMPT);
+      offTopicChatRef.current = makeAgent(OFFTOPIC_PROMPT);
 
       setMessages([{
         author: MessageAuthor.AI,
