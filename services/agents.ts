@@ -488,7 +488,7 @@ export const createAgent = (ai: GoogleGenAI, basePrompt: string, userProfile: Us
   const systemInstruction = buildSystemInstruction(basePrompt, userProfile);
 
   return ai.chats.create({
-    model: "gemini-2.5-flash-lite",
+    model: "gemini-flash-lite-latest",
     config: {
       systemInstruction,
       temperature: 0.3,
@@ -510,7 +510,7 @@ export const createAgentWithHistory = (
   const systemInstruction = buildSystemInstruction(basePrompt, userProfile);
 
   return ai.chats.create({
-    model: "gemini-2.5-flash-lite",
+    model: "gemini-flash-lite-latest",
     config: {
       systemInstruction,
       temperature: 0.3,

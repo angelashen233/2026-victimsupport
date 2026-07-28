@@ -67,7 +67,7 @@ User Profile Context:
 Based on the following conversation, extract the relevant details and structure them into a formal incident report. The user has given their consent to create this draft. Be objective and stick strictly to the facts provided in the conversation. If a piece of information for a field is missing from the conversation, you must state 'Not specified' for that field. Format the output as a JSON object that matches the provided schema. The report should be professional and suitable for submission to HR, legal counsel, or authorities. Also generate a list of credible or official contacts relevant to the incident's context.\n\nConversation:\n${chatHistory}`;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-lite',
+        model: 'gemini-flash-lite-latest',
         contents: prompt,
         config: {
             responseMimeType: 'application/json',
@@ -174,7 +174,7 @@ Conversation:
 ${chatHistory}`;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-lite',
+        model: 'gemini-flash-lite-latest',
         contents: prompt,
         config: {
             responseMimeType: 'application/json',
