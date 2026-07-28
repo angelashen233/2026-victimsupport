@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ChatScreen from './components/ChatScreen';
 import DisclaimerScreen from './components/DisclaimerScreen';
 import PrivacyPolicyScreen from './components/PrivacyPolicyScreen';
@@ -89,11 +89,15 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // ── Dev-only: prefer a local Ollama model over Gemini if one is running ───
-  // Never runs in production builds — deployed users have no local model to
-  // reach, so they always use Gemini directly.
+  // ── Prefer a local Ollama model over Gemini if one is running ─────────────
+  // Gated by VITE_ENABLE_LOCAL_MODEL rather than import.meta.env.DEV, so it
+  // works in the deployed build too (only for whoever is running Ollama on
+  // the machine loading the page — everyone else fails the reachability
+  // check below and silently uses Gemini, same as always).
+  // To retire this once there's a real cloud AI backend: set
+  // VITE_ENABLE_LOCAL_MODEL=false (or delete the var) — no code change needed.
   useEffect(() => {
-    if (!import.meta.env.DEV) return;
+    if (import.meta.env.VITE_ENABLE_LOCAL_MODEL !== 'true') return;
     isOllamaAvailable().then(available => {
       useLocalModelRef.current = available;
       if (available) console.info(`Local model detected — using Ollama (${OLLAMA_MODEL}) with Gemini fallback.`);
@@ -186,31 +190,32 @@ const App: React.FC = () => {
 
   const nearestHospitals = allHospitalsSorted.slice(0, 2);
 
-  // ── Start chat ─────────────────────────────────────────────
-  const handleStartChat = useCallback((prompt?: string) => {
-    if (!aiRef.current) {
-      setError('AI service is not available. Please check your API key and refresh.');
-      return;
-    }
-    if (prompt) setInitialPrompt(prompt);
-    // Use the already-computed sorted hospital list from the sidebar — no re-sorting needed
-    const hospitalData = allHospitalsSorted.map(({ hospital: h, dist }) => ({
-      name: h.name,
-      address: h.address,
-      phone: h.phone ?? null,
-      website: h.website ?? null,
-      distanceKm: dist,
-      waitTimeMinutes: h.waitTime?.waitTimeMinutes ?? null,
-      open247: !!h.open247,
-    }));
+  // ── Live hospital/resource context, recomputed every render ───────────────
+  // Passed to ChatScreen and injected fresh into every outgoing message
+  // (rather than baked once into the system prompt at chat-start) so the AI
+  // always sees current wait times — including when geolocation/wait-time
+  // data wasn't ready yet at the moment the chat session started.
+  const hospitalData = allHospitalsSorted.map(({ hospital: h, dist }) => ({
+    name: h.name,
+    address: h.address,
+    phone: h.phone ?? null,
+    website: h.website ?? null,
+    distanceKm: dist,
+    waitTimeMinutes: h.waitTime?.waitTimeMinutes ?? null,
+    open247: !!h.open247,
+  }));
 
+  const hospitalContext = hospitalData.length > 0
+    ? '\n---\nHOSPITALS (pre-sorted nearest first, index 0 = closest). Use index 0 as the primary recommendation:\n' + JSON.stringify(hospitalData, null, 2) + '\n---'
+    : '';
+
+  const victimSupportContext = useMemo(() => {
     let victimSupportData: any[] = [];
     try {
       const stored = localStorage.getItem('victim_support_resources');
       if (stored) victimSupportData = JSON.parse(stored);
     } catch (e) { console.error('Failed to load victim support data:', e); }
 
-    // Pre-sort victim support resources by distance (province-wide resources with null lat go last)
     if (userLocation && victimSupportData.length > 0) {
       victimSupportData = victimSupportData
         .map((r: any) => ({
@@ -226,27 +231,37 @@ const App: React.FC = () => {
         });
     }
 
-    const hospitalSummary = hospitalData.length > 0
-      ? '\n---\nHOSPITALS (pre-sorted nearest first, index 0 = closest). Use index 0 as the primary recommendation:\n' + JSON.stringify(hospitalData, null, 2) + '\n---'
-      : '';
-
-    const victimSupportSummary = victimSupportData.length > 0
+    return victimSupportData.length > 0
       ? '\n---\nVICTIM SUPPORT RESOURCES (pre-sorted nearest first, distanceKm=null means province-wide):\n' + JSON.stringify(victimSupportData, null, 2) + '\n---'
       : '';
+  }, [userLocation]);
+
+  const liveContext = hospitalContext + victimSupportContext;
+
+  // ── Start chat ─────────────────────────────────────────────
+  const handleStartChat = useCallback((prompt?: string) => {
+    if (!aiRef.current) {
+      setError('AI service is not available. Please check your API key and refresh.');
+      return;
+    }
+    if (prompt) setInitialPrompt(prompt);
 
     try {
+      // hospitalData/liveContext come from the top-level derivation above and
+      // are recomputed every render — but note this is still just a snapshot
+      // at whatever moment handleStartChat runs. ChatScreen re-sends a fresh
+      // copy of liveContext on every message, which is what actually keeps
+      // the AI's hospital/resource data current through the whole session.
       const userProfileWithHospitals = { ...userProfile, hospitalData };
-      const prepend = (base: string) => `${hospitalSummary}${victimSupportSummary}\n${base}`;
       const ai = aiRef.current;
 
       // Dev-only: route through the local Ollama model, falling back to Gemini
       // mid-session if it's unavailable or errors. See services/ollamaChat.ts.
       const makeAgent = (basePrompt: string): ChatLike => {
-        const prompt = prepend(basePrompt);
-        if (!useLocalModelRef.current) return createAgent(ai, prompt, userProfileWithHospitals);
+        if (!useLocalModelRef.current) return createAgent(ai, basePrompt, userProfileWithHospitals);
         return createHybridAgent(
-          buildSystemInstruction(prompt, userProfileWithHospitals),
-          history => createAgentWithHistory(ai, prompt, userProfileWithHospitals, history),
+          buildSystemInstruction(basePrompt, userProfileWithHospitals),
+          history => createAgentWithHistory(ai, basePrompt, userProfileWithHospitals, history),
         );
       };
 
@@ -267,7 +282,7 @@ const App: React.FC = () => {
       console.error(e);
       setError('Could not initialize the AI assistant. Please check your API key and refresh the page.');
     }
-  }, [userProfile, allHospitalsSorted, userLocation]);
+  }, [userProfile, hospitalData]);
 
   // ── Generate report ────────────────────────────────────────
   const handleGenerateReport = useCallback(async () => {
@@ -362,6 +377,7 @@ const App: React.FC = () => {
               location: locationChatRef.current,
               offtopic: offTopicChatRef.current,
             }}
+            liveContext={liveContext}
             activeAgent={activeAgent}
             setActiveAgent={setActiveAgent}
             onGenerateReport={handleGenerateReport}

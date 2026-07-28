@@ -74,6 +74,11 @@ interface ChatScreenProps {
         location: ChatLike | null;
         offtopic: ChatLike | null;
     };
+    // Current hospital wait-time + victim support resource data, recomputed
+    // by App.tsx on every render. Injected into every outgoing message here
+    // rather than baked once into the system prompt at chat-start, so it
+    // can't go stale or get missed by a geolocation/fetch timing race.
+    liveContext: string;
     activeAgent: AgentType;
     setActiveAgent: React.Dispatch<React.SetStateAction<AgentType>>;
     onGenerateReport: () => void;
@@ -198,6 +203,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
     messages,
     setMessages,
     chats,
+    liveContext,
     activeAgent,
     setActiveAgent,
     onGenerateReport,
@@ -316,7 +322,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
             }
             });
         }
-      
+        if (liveContext) parts.push({ text: liveContext });
+
         let responseText: string;
 
         // Always run the manager first to route every message to the right agent.
@@ -377,7 +384,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         setIsThinking(false);
         setIsWriting(false);
     }
-  }, [activeAgent, chats, setActiveAgent, setError, setMessages]);
+  }, [activeAgent, chats, liveContext, setActiveAgent, setError, setMessages]);
 
   // Auto-send a prompt that was selected on the disclaimer screen
   const autoSentRef = useRef(false);
