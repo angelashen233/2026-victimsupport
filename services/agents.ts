@@ -447,9 +447,13 @@ Operating principles:
  * prompt) shared by both the real Gemini agent and the local-model fallback, so the
  * two backends are held to the same rules.
  */
-export const buildSystemInstruction = (basePrompt: string, userProfile: UserProfile): string => {
-  const now = new Date();
-  const chatTimestamp = now.toLocaleString("en-CA", {
+// Deliberately NOT included in buildSystemInstruction's contextHeader below —
+// the system prompt is only computed once, at chat-start, and several prompts
+// (e.g. INFO_PROMPT's resource open/closed filtering) depend on this being
+// the *current* time on every turn, not the time the session began. Call this
+// fresh on every message instead (see App.tsx's liveContext / ChatScreen.tsx).
+export const formatVancouverTimestamp = (date: Date = new Date()): string =>
+  date.toLocaleString("en-CA", {
     timeZone: "America/Vancouver",
     weekday: "long",
     year: "numeric",
@@ -461,12 +465,12 @@ export const buildSystemInstruction = (basePrompt: string, userProfile: UserProf
     timeZoneName: "short",
   });
 
+export const buildSystemInstruction = (basePrompt: string, userProfile: UserProfile): string => {
   const contextHeader = `
 ---
 USER CONTEXT:
 Location: ${userProfile.location}
 Gender: ${userProfile.gender}
-Current date/time (Vancouver, PT): ${chatTimestamp}
 ---
   `.trim();
 

@@ -8,7 +8,7 @@ import { Modality } from '@google/genai';
 import { GenerateReportIcon, SendIcon, UserIcon, BotIcon, AttachmentIcon, CameraIcon, AudioIcon, ResourcesIcon, CompileIcon, MicrophoneIcon, DownloadIcon } from './icons';
 import type { AgentType } from '../App';
 import type { ChatLike } from '../services/agents';
-import { VOICE_PROMPT } from '../services/agents';
+import { VOICE_PROMPT, formatVancouverTimestamp } from '../services/agents';
 
 // Voice Chat Audio Helpers
 function decode(base64: string) {
@@ -322,7 +322,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
             }
             });
         }
-        if (liveContext) parts.push({ text: liveContext });
+        // Computed fresh at send-time, not baked into the system prompt at chat-start —
+        // several prompts (e.g. INFO_PROMPT's resource open/closed filtering) depend on
+        // this being the actual current time, which matters for conversations that run
+        // long enough to cross an hour boundary.
+        const timeContext = `\n---\nCurrent date/time (Vancouver, PT): ${formatVancouverTimestamp()}\n---`;
+        parts.push({ text: timeContext + liveContext });
 
         let responseText: string;
 
