@@ -1,4 +1,3 @@
-import type { Chat } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ChatScreen from './components/ChatScreen';
@@ -12,6 +11,7 @@ import WaitTimeMenu from './components/WaitTimeMenu';
 import { initialUserProfile } from './data/userProfile';
 import { createAgent, INFO_PROMPT, LOCATION_PROMPT, MANAGER_PROMPT, OFFTOPIC_PROMPT } from './services/agents';
 import { generateReport, generateResources } from './services/geminiService';
+import { checkOllamaReachable, getAIProvider, type AgentChat } from './services/ollamaService';
 import type { Message, Recipient, ReportData, Resource, UserProfile } from './types';
 import { MessageAuthor } from './types';
 
@@ -50,10 +50,10 @@ const App: React.FC = () => {
 
   // ── Refs ─────────────────────────────────────────────────
   const aiRef           = useRef<GoogleGenAI | null>(null);
-  const managerChatRef  = useRef<Chat | null>(null);
-  const infoChatRef     = useRef<Chat | null>(null);
-  const locationChatRef = useRef<Chat | null>(null);
-  const offTopicChatRef = useRef<Chat | null>(null);
+  const managerChatRef  = useRef<AgentChat | null>(null);
+  const infoChatRef     = useRef<AgentChat | null>(null);
+  const locationChatRef = useRef<AgentChat | null>(null);
+  const offTopicChatRef = useRef<AgentChat | null>(null);
 
   // ── Reset ─────────────────────────────────────────────────
   const handleStartOver = () => {
@@ -76,6 +76,13 @@ const App: React.FC = () => {
 
   // ── Init AI ───────────────────────────────────────────────
   useEffect(() => {
+    if (getAIProvider() === 'ollama') {
+      checkOllamaReachable().catch(e => {
+        console.error(e);
+        setError(e.message);
+      });
+      return;
+    }
     try {
       const apiKey = process.env.API_KEY;
       if (!apiKey) throw new Error('API_KEY not found');
@@ -167,7 +174,7 @@ const App: React.FC = () => {
 
   // ── Start chat ─────────────────────────────────────────────
   const handleStartChat = useCallback((prompt?: string) => {
-    if (!aiRef.current) {
+    if (getAIProvider() !== 'ollama' && !aiRef.current) {
       setError('AI service is not available. Please check your API key and refresh.');
       return;
     }
@@ -240,7 +247,7 @@ const App: React.FC = () => {
     setIsGeneratingReport(true);
     setError(null);
     try {
-      if (!aiRef.current) throw new Error('AI not initialized');
+      if (getAIProvider() !== 'ollama' && !aiRef.current) throw new Error('AI not initialized');
       const result = await generateReport(aiRef.current, messages, userProfile);
       setReportData(result.report);
       setRecipients(result.recipients);
@@ -258,7 +265,7 @@ const App: React.FC = () => {
     setIsGeneratingResources(true);
     setError(null);
     try {
-      if (!aiRef.current) throw new Error('AI not initialized');
+      if (getAIProvider() !== 'ollama' && !aiRef.current) throw new Error('AI not initialized');
       const result = await generateResources(aiRef.current, messages, userProfile);
       setResources(result.resources);
       setAppState('resources');

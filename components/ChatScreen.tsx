@@ -3,11 +3,12 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { Message, UserProfile } from '../types';
 import { MessageAuthor } from '../types';
 // FIX: Removed 'LiveSession' which is not an exported member, and aliased 'Blob' to 'GenAIBlob' to avoid conflict with the native DOM Blob type.
-import type { Chat, Part, LiveServerMessage, Blob as GenAIBlob, GoogleGenAI } from '@google/genai';
+import type { Part, LiveServerMessage, Blob as GenAIBlob, GoogleGenAI } from '@google/genai';
 import { Modality } from '@google/genai';
 import { GenerateReportIcon, SendIcon, UserIcon, BotIcon, AttachmentIcon, CameraIcon, AudioIcon, ResourcesIcon, CompileIcon, MicrophoneIcon, DownloadIcon } from './icons';
 import type { AgentType } from '../App';
 import { VOICE_PROMPT } from '../services/agents';
+import type { AgentChat } from '../services/ollamaService';
 
 // Voice Chat Audio Helpers
 function decode(base64: string) {
@@ -68,10 +69,10 @@ interface ChatScreenProps {
     messages: Message[];
     setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
     chats: {
-        manager: Chat | null;
-        info: Chat | null;
-        location: Chat | null;
-        offtopic: Chat | null;
+        manager: AgentChat | null;
+        info: AgentChat | null;
+        location: AgentChat | null;
+        offtopic: AgentChat | null;
     };
     activeAgent: AgentType;
     setActiveAgent: React.Dispatch<React.SetStateAction<AgentType>>;
@@ -266,7 +267,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+
   // Voice chat refs and state
   const [voiceConnectionStatus, setVoiceConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   // FIX: Changed LiveSession to 'any' as it's not an exported type.
@@ -290,7 +291,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
   useEffect(scrollToBottom, [messages, streamingInput, streamingOutput]);
 
-  
+
   // Voice Chat Cleanup
   useEffect(() => {
     return () => {
@@ -315,7 +316,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
             }
             });
         }
-      
+
         let responseText: string;
 
         // Always run the manager first to route every message to the right agent.
@@ -324,7 +325,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         const route = (routerResult.text ?? '').trim();
 
         let nextAgent: AgentType = 'info';
-        let nextAgentChat: Chat | null = chats.info;
+        let nextAgentChat: AgentChat | null = chats.info;
 
         if (route.includes('[MAP]') || route.includes('[LOCATION]')) {
             nextAgent = 'location';
@@ -340,7 +341,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         if (!nextAgentChat) throw new Error(`No agent available — all chat refs are null. Check API key and initialization.`);
         const agentResponse = await nextAgentChat.sendMessage({ message: parts });
         responseText = agentResponse.text ?? '';
-      
+
         // Parse for quick replies
         const quickReplyRegex = /\[QUICK_REPLIES:\s*(.*?)\]/s;
         const match = responseText.match(quickReplyRegex);
@@ -366,7 +367,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
             } catch {}
             cleanText = cleanText.replace(pinRegex, '').trim();
         }
-        
+
         const aiMessage: Message = { author: MessageAuthor.AI, text: cleanText, quickReplies, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
         setMessages(prev => [...prev, aiMessage]);
     } catch (e: any) {
@@ -393,13 +394,13 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
   const handleSend = async () => {
     if ((!input.trim() && !attachedImage) || isThinking) return;
-    const userMessage: Message = { author: MessageAuthor.USER, text: input, image: attachedImage, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+    const userMessage: Message = { author: MessageAuthor.USER, text: input, image: attachedImage ?? undefined, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setAttachedImage(null);
     await sendMessageToAI(userMessage);
   };
-  
+
   const handleQuickReplyClick = async (replyText: string) => {
       if (isThinking) return;
       const userMessage: Message = { author: MessageAuthor.USER, text: replyText, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
@@ -450,7 +451,7 @@ ${VOICE_PROMPT}
                             sum += inputData[i] * inputData[i];
                         }
                         const rms = Math.sqrt(sum / inputData.length);
-                        
+
                         if (animationFrameRef.current === null) {
                             animationFrameRef.current = requestAnimationFrame(() => {
                                 setMicVolume(rms);
@@ -469,10 +470,10 @@ ${VOICE_PROMPT}
                 },
                 onmessage: async (message: LiveServerMessage) => {
                     if (message.serverContent?.outputTranscription) {
-                        setStreamingOutput(prev => prev + message.serverContent.outputTranscription.text);
+                        setStreamingOutput(prev => prev + message.serverContent?.outputTranscription?.text);
                     }
                     if (message.serverContent?.inputTranscription) {
-                        setStreamingInput(prev => prev + message.serverContent.inputTranscription.text);
+                        setStreamingInput(prev => prev + message.serverContent?.inputTranscription?.text);
                     }
                     if (message.serverContent?.turnComplete) {
                         const newMessages: Message[] = [];
@@ -541,7 +542,7 @@ ${VOICE_PROMPT}
   const stopVoiceChat = () => {
     liveSessionRef.current?.then(session => session.close());
     liveSessionRef.current = null;
-    
+
     mediaStreamRef.current?.getTracks().forEach(track => track.stop());
     mediaStreamRef.current = null;
 
@@ -549,12 +550,12 @@ ${VOICE_PROMPT}
     audioProcessorNodeRef.current?.disconnect();
     audioSourceNodeRef.current = null;
     audioProcessorNodeRef.current = null;
-    
+
     inputAudioContextRef.current?.close();
     outputAudioContextRef.current?.close();
     inputAudioContextRef.current = null;
     outputAudioContextRef.current = null;
-    
+
     outputSourcesRef.current.forEach(source => source.stop());
     outputSourcesRef.current.clear();
     nextStartTimeRef.current = 0;
@@ -569,7 +570,7 @@ ${VOICE_PROMPT}
 
     setVoiceConnectionStatus('idle');
   };
-  
+
   const handleToggleVoiceChat = () => {
     if (voiceConnectionStatus === 'connected') {
         stopVoiceChat();
@@ -1100,12 +1101,12 @@ ${VOICE_PROMPT}
               e.target.value = '';
             }}
           />
-          <button onClick={() => fileInputRef.current?.click()} title="Attach photo from device"
-            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${dm ? 'hover:bg-slate-700 hover:text-slate-300' : 'hover:bg-gray-100 hover:text-gray-600'}`}>
+          <button onClick={() => fileInputRef.current?.click()} title="Attach photo from device" disabled={!ai}
+            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${dm ? 'hover:bg-slate-700 hover:text-slate-300' : 'hover:bg-gray-100 hover:text-gray-600'}`}>
             <AttachmentIcon />
           </button>
-          <button onClick={openCamera} title="Take a photo"
-            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${dm ? 'hover:bg-slate-700 hover:text-slate-300' : 'hover:bg-gray-100 hover:text-gray-600'}`}>
+          <button onClick={openCamera} title="Take a photo" disabled={!ai}
+            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${dm ? 'hover:bg-slate-700 hover:text-slate-300' : 'hover:bg-gray-100 hover:text-gray-600'}`}>
             <CameraIcon />
           </button>
           <button onClick={() => setShowRecorder(true)} title="Record a private audio memo"

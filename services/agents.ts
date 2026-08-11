@@ -1,5 +1,6 @@
-import { GoogleGenAI, Chat } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import type { UserProfile } from "../types";
+import { createOllamaAgent, getAIProvider, type AgentChat } from "./ollamaService";
 
 // =============================================================================
 // REFERENCE: Partner Organizations & Support Resources
@@ -441,7 +442,7 @@ Operating principles:
  * @param userProfile The user's profile data.
  * @returns A new Chat instance.
  */
-export const createAgent = (ai: GoogleGenAI, basePrompt: string, userProfile: UserProfile): Chat => {
+export const createAgent = (ai: GoogleGenAI | null, basePrompt: string, userProfile: UserProfile): AgentChat => {
   const now = new Date();
   const chatTimestamp = now.toLocaleString("en-CA", {
     timeZone: "America/Vancouver",
@@ -466,8 +467,14 @@ Current date/time (Vancouver, PT): ${chatTimestamp}
 
   const systemInstruction = `${BASELINE_SAFETY_RULES}\n\n${contextHeader}\n\n${basePrompt}`;
 
+  if (getAIProvider() === 'ollama') {
+    return createOllamaAgent(systemInstruction);
+  }
+
+  if (!ai) throw new Error('Gemini client not initialized.');
+
   return ai.chats.create({
-    model: "gemini-2.5-flash",
+    model: "gemini-3.5-flash",
     config: {
       systemInstruction,
       temperature: 0.3,

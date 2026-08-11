@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import type { Message, ReportData, Recipient, UserProfile, Resource } from '../types';
 import { MessageAuthor } from "../types";
+import { generateJSONWithOllama, getAIProvider, toJsonSchema } from "./ollamaService";
 
 const reportGenerationSchema = {
     type: Type.OBJECT,
@@ -53,7 +54,7 @@ const resourceGenerationSchema = {
 };
 
 
-export const generateReport = async (ai: GoogleGenAI, messages: Message[], userProfile: UserProfile): Promise<{ report: ReportData; recipients: Recipient[] }> => {
+export const generateReport = async (ai: GoogleGenAI | null, messages: Message[], userProfile: UserProfile): Promise<{ report: ReportData; recipients: Recipient[] }> => {
     const chatHistory = messages
         .filter(m => m.author !== MessageAuthor.AI || !m.text.startsWith("Hello. I'm here to listen")) // Filter out initial greeting
         .map(m => `${m.author === MessageAuthor.USER ? 'Person' : 'Assistant'}: ${m.text} ${m.image ? '[User provided an image]' : ''}`)
@@ -66,8 +67,19 @@ User Profile Context:
 
 Based on the following conversation, extract the relevant details and structure them into a formal incident report. The user has given their consent to create this draft. Be objective and stick strictly to the facts provided in the conversation. If a piece of information for a field is missing from the conversation, you must state 'Not specified' for that field. Format the output as a JSON object that matches the provided schema. The report should be professional and suitable for submission to HR, legal counsel, or authorities. Also generate a list of credible or official contacts relevant to the incident's context.\n\nConversation:\n${chatHistory}`;
 
+    if (getAIProvider() === 'ollama') {
+        try {
+            return await generateJSONWithOllama(prompt, toJsonSchema(reportGenerationSchema));
+        } catch (e) {
+            console.error("Failed to get report JSON from Ollama:", e);
+            throw new Error("The AI returned an invalid report format. Please try again.");
+        }
+    }
+
+    if (!ai) throw new Error('Gemini client not initialized.');
+
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.5-flash',
         contents: prompt,
         config: {
             responseMimeType: 'application/json',
@@ -86,7 +98,7 @@ Based on the following conversation, extract the relevant details and structure 
     }
 };
 
-export const generateResources = async (ai: GoogleGenAI, messages: Message[], userProfile: UserProfile): Promise<{ resources: Resource[] }> => {
+export const generateResources = async (ai: GoogleGenAI | null, messages: Message[], userProfile: UserProfile): Promise<{ resources: Resource[] }> => {
     const chatHistory = messages
         .filter(m => m.author !== MessageAuthor.AI || !m.text.startsWith("Hello. I'm here to listen"))
         .map(m => `${m.author === MessageAuthor.USER ? 'Person' : 'Assistant'}: ${m.text}`)
@@ -173,45 +185,50 @@ Based on the following conversation, please compile a list of relevant local and
 Conversation:
 ${chatHistory}`;
 
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-            responseMimeType: 'application/json',
-            responseSchema: resourceGenerationSchema,
-            temperature: 0.2
-        }
-    });
-
-    const jsonString = response.text;
+    let parsedJson: { resources?: Resource[] };
     try {
-        const parsedJson = JSON.parse(jsonString);
-        let resources: Resource[] = parsedJson.resources || [];
-        if (isVancouver) {
-          const contextResources: Resource[] = [...vancouverResources];
-
-          // Add UBC resources if near UBC campus or user mentions UBC/being a student
-          if (isNearUBC || mentionsUBC || ((isNearSFU || mentionsSFU) === false && mentionsStudent)) {
-            contextResources.push(...ubcResources);
-          }
-
-          // Add SFU resources if near SFU or user mentions SFU
-          if (isNearSFU || mentionsSFU) {
-            contextResources.push(...sfuResources);
-          }
-
-          // Prepend context resources, remove duplicates by name
-          const allResources = [...contextResources, ...resources];
-          const seen = new Set<string>();
-          resources = allResources.filter(r => {
-            if (seen.has(r.name)) return false;
-            seen.add(r.name);
-            return true;
-          });
+        if (getAIProvider() === 'ollama') {
+            parsedJson = await generateJSONWithOllama(prompt, toJsonSchema(resourceGenerationSchema));
+        } else {
+            if (!ai) throw new Error('Gemini client not initialized.');
+            const response = await ai.models.generateContent({
+                model: 'gemini-3.5-flash',
+                contents: prompt,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: resourceGenerationSchema,
+                    temperature: 0.2
+                }
+            });
+            parsedJson = JSON.parse(response.text);
         }
-        return { resources };
     } catch (e) {
-        console.error("Failed to parse JSON from Gemini for resources:", jsonString);
+        console.error("Failed to get resources JSON:", e);
         throw new Error("The AI returned an invalid resource list format. Please try again.");
     }
+
+    let resources: Resource[] = parsedJson.resources || [];
+    if (isVancouver) {
+      const contextResources: Resource[] = [...vancouverResources];
+
+      // Add UBC resources if near UBC campus or user mentions UBC/being a student
+      if (isNearUBC || mentionsUBC || ((isNearSFU || mentionsSFU) === false && mentionsStudent)) {
+        contextResources.push(...ubcResources);
+      }
+
+      // Add SFU resources if near SFU or user mentions SFU
+      if (isNearSFU || mentionsSFU) {
+        contextResources.push(...sfuResources);
+      }
+
+      // Prepend context resources, remove duplicates by name
+      const allResources = [...contextResources, ...resources];
+      const seen = new Set<string>();
+      resources = allResources.filter(r => {
+        if (seen.has(r.name)) return false;
+        seen.add(r.name);
+        return true;
+      });
+    }
+    return { resources };
 };
