@@ -1,4 +1,5 @@
 import { corsHeaders, isAllowedOrigin } from './cors.js';
+import { checkRateLimit } from './rateLimit.js';
 
 export default {
   async fetch(request, env) {
@@ -13,6 +14,15 @@ export default {
     if (!isAllowedOrigin(origin, allowedOrigins)) {
       return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
         status: 403,
+        headers: { 'Content-Type': 'application/json', ...headers },
+      });
+    }
+
+    const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const allowed = await checkRateLimit(env, ip);
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
+        status: 429,
         headers: { 'Content-Type': 'application/json', ...headers },
       });
     }
