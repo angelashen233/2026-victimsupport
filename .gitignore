@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 .wrangler
+.dev.vars
 .claude
 .worktrees
 .superpowers
