@@ -52,8 +52,31 @@ that pattern with a second, independent Worker for AI calls.
   four chat agents, structured JSON report/resource generation, and the
   Ollama dev fallback's ultimate target. Nothing stays on Gemini in the
   text path.
-- **Model:** Claude Haiku 4.5 on Bedrock — fast/cheap tier, appropriate for
-  short turn-based support chat replies and forced-tool-call JSON output.
+- **Model & region:** Meta **Llama 3 8B Instruct**
+  (`meta.llama3-8b-instruct-v1:0`) on Bedrock, called **in-region in
+  `ca-central-1` (Canada)** — required for data residency. This was chosen
+  over Claude after checking current AWS documentation:
+  - Claude Haiku 4.5 has no in-region option in `ca-central-1` (only
+    Global cross-region, which can route outside Canada).
+  - Claude 3 Haiku is in-region in `ca-central-1` but is a legacy model
+    with an EOL of September 10, 2026 — not viable to build on now.
+  - Amazon Nova Micro/Lite are not available in `ca-central-1` at all
+    (in-region, geo, or global).
+  - Llama 3 8B Instruct is confirmed in-region in `ca-central-1` and is
+    the most viable current option under this constraint.
+
+  Trade-offs accepted with this choice, flagged to and confirmed by the
+  user:
+  - **No tool-use / structured-output support.** Unlike Claude, Nova, or
+    Llama 3.1, this model's Bedrock capability table does not include
+    Converse tool calling. Structured JSON (report/resource generation)
+    therefore cannot use forced-tool-call output (see "Structured JSON
+    output strategy" below).
+  - **Materially smaller/older model** (8B params, Dec 2023 knowledge
+    cutoff) than Claude Haiku 4.5, worth testing carefully against this
+    app's safety-critical prompts (the exact-phrase crisis override,
+    no-roleplay refusal, trauma-informed tone in `BASELINE_SAFETY_RULES`)
+    since smaller models follow detailed instructions less reliably.
 - **Voice chat:** Explicitly **out of scope** for this migration. It keeps
   using Gemini Live directly (`GEMINI_API_KEY` stays required client-side
   for this one feature). Bedrock has no direct equivalent to Gemini Live
@@ -73,17 +96,19 @@ Browser (React/Vite, static site)
   ├─ Report generation (JSON)                    ├──► ai-worker/ (new Cloudflare Worker)
   ├─ Resource generation (JSON)                   │        │ signs requests with aws4fetch
   ├─ Dev Ollama fallback target ──────────────────┘        ▼
-  │                                               AWS Bedrock Runtime → Claude Haiku 4.5
+  │                                    AWS Bedrock Runtime (ca-central-1, in-region)
+  │                                          → Llama 3 8B Instruct
   └─ Voice chat (Live API) ───────────────────► Gemini directly (unchanged)
 ```
 
 `ai-worker/` signs requests to Bedrock's **Converse API** (not the raw,
 model-specific `InvokeModel` body) using `aws4fetch`, a lightweight SigV4
-signer that works in the Workers runtime without Node polyfills. Converse
-is AWS's normalized request/response shape across model families, and it
-covers everything needed here: system prompts, multi-turn history, inline
-image content blocks, and forced tool-use calls for structured JSON output
-(the Bedrock/Claude equivalent of Gemini's `responseSchema` mode).
+signer that works in the Workers runtime without Node polyfills, targeting
+the `ca-central-1` region so requests stay in-region. Converse is AWS's
+normalized request/response shape across model families, and covers
+system prompts, multi-turn history, and inline image content blocks. It
+does **not** cover forced tool-use here, since Llama 3 8B Instruct doesn't
+support Converse tool calling (see below).
 
 ### Worker endpoints
 
@@ -94,10 +119,36 @@ image content blocks, and forced tool-use calls for structured JSON output
   `services/ollamaChat.ts` and `services/agents.ts`). Response:
   `{ text }`.
 - **`POST /api/structured`** — replaces `generateReport` /
-  `generateResources`. Request body: `{ prompt, schema }`. Internally
-  issues a Converse call with `toolConfig` forcing a single tool call whose
-  `inputSchema` is the caller's JSON schema; Claude's tool-use response is
-  parsed and returned as the structured JSON object.
+  `generateResources`. Request body: `{ prompt, schema }`. See "Structured
+  JSON output strategy" below for how this produces valid JSON without
+  tool-use support.
+
+### Structured JSON output strategy
+
+Llama 3 8B Instruct doesn't support Bedrock's Converse tool-use/structured-
+output feature, so `/api/structured` can't force schema-conformant output
+the way Gemini's `responseSchema` or Claude's forced tool-call would. It
+uses prompt-based JSON generation with a parse/retry loop instead:
+
+1. The Worker embeds a description of the target JSON schema directly into
+   the prompt sent to the model (field names, types, and the "Not
+   specified" convention already used in `services/geminiService.ts`),
+   explicitly instructing it to respond with JSON only.
+2. The model's text response is parsed as JSON. On success, the parsed
+   object is returned.
+3. If parsing fails (malformed JSON, extra prose around it, etc.), the
+   Worker retries **once** with a follow-up prompt that includes the
+   invalid output and asks the model to correct it into valid JSON
+   matching the schema.
+4. If the retry also fails to parse, the Worker returns a 502 with an
+   error body, and the frontend surfaces the same
+   "The AI returned an invalid report format. Please try again." error
+   path that `services/geminiService.ts` already has today.
+
+This is inherently less reliable than tool-use-forced output, and is a
+direct consequence of choosing an in-region `ca-central-1` model for data
+residency. Worth re-validating empirically once implemented — if failure
+rates are too high in practice, revisit the model choice.
 
 Both endpoints:
 
@@ -113,8 +164,8 @@ Both endpoints:
   or rate-limited requests get 403/429 with no body leakage.
 
 Secrets stored via `wrangler secret put`: `AWS_ACCESS_KEY_ID`,
-`AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `BEDROCK_MODEL_ID`,
-`ALLOWED_ORIGINS`.
+`AWS_SECRET_ACCESS_KEY`, `AWS_REGION` (`ca-central-1`), `BEDROCK_MODEL_ID`
+(`meta.llama3-8b-instruct-v1:0`), `ALLOWED_ORIGINS`.
 
 ## Frontend changes
 
@@ -148,8 +199,8 @@ Secrets stored via `wrangler secret put`: `AWS_ACCESS_KEY_ID`,
 - **`.env.example`** / **`README.md`**: add `VITE_AI_WORKER_URL`; note
   that `GEMINI_API_KEY` is now required only for voice chat; add
   `ai-worker/README.md` documenting AWS credential setup and the one-time
-  manual step of enabling Claude Haiku 4.5 model access in the Bedrock
-  console.
+  manual step of enabling Llama 3 8B Instruct model access in the Bedrock
+  console, in the `ca-central-1` region.
 
 ## Error handling
 
@@ -157,7 +208,10 @@ Worker-side failures (Bedrock unreachable, model access not granted,
 throttled, AWS auth misconfigured) surface as HTTP error responses that
 the frontend maps to the same user-facing error path that exists today
 (`setError('Could not initialize the AI service...')`), rather than
-introducing a new error-handling mechanism.
+introducing a new error-handling mechanism. `/api/structured`'s
+parse/retry failure (see "Structured JSON output strategy") maps to the
+existing "The AI returned an invalid report format. Please try again."
+error path.
 
 ## Testing / verification
 
@@ -169,9 +223,13 @@ No automated test framework exists in this repo. Verification mirrors how
 2. Point `.env.local`'s `VITE_AI_WORKER_URL` at the local Worker, run
    `npm run dev`, and exercise the full app: manager routing, all four
    agent replies, report generation, resource generation.
-3. Confirm the dev-only Ollama fallback still falls back correctly to the
+3. Generate several reports/resource lists across varied conversations to
+   gauge the real-world JSON parse-failure and retry-success rate for
+   `/api/structured` (see "Structured JSON output strategy") — this is the
+   main empirical unknown introduced by dropping tool-use support.
+4. Confirm the dev-only Ollama fallback still falls back correctly to the
    new Bedrock-backed path.
-4. Confirm voice chat is unaffected (still uses Gemini Live as before).
+5. Confirm voice chat is unaffected (still uses Gemini Live as before).
 
 ## Out of scope
 
