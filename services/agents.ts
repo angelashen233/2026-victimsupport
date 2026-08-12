@@ -1,6 +1,6 @@
-import { GoogleGenAI, Chat } from "@google/genai";
 import type { Content, Part } from "@google/genai";
 import type { UserProfile } from "../types";
+import { createBedrockAgent } from "./bedrockChat";
 
 // Minimal structural interface both the real Gemini `Chat` and the local-model
 // fallback wrapper (services/ollamaChat.ts) satisfy, so callers don't need to
@@ -479,42 +479,25 @@ Gender: ${userProfile.gender}
 
 /**
  * Creates a new chat instance with a specific system instruction and user context.
- * @param ai The GoogleGenAI instance.
  * @param basePrompt The base prompt for the agent.
  * @param userProfile The user's profile data.
- * @returns A new Chat instance.
+ * @returns A ChatLike backed by the ai-worker Bedrock proxy.
  */
-export const createAgent = (ai: GoogleGenAI, basePrompt: string, userProfile: UserProfile): Chat => {
+export const createAgent = (basePrompt: string, userProfile: UserProfile): ChatLike => {
   const systemInstruction = buildSystemInstruction(basePrompt, userProfile);
-
-  return ai.chats.create({
-    model: "gemini-flash-lite-latest",
-    config: {
-      systemInstruction,
-      temperature: 0.3,
-    },
-  });
+  return createBedrockAgent(systemInstruction);
 };
 
 /**
  * Same as createAgent, but seeds the chat with prior conversation turns.
  * Used when the local-model fallback (services/ollamaChat.ts) has to hand a
- * mid-conversation session over to Gemini and needs Gemini to have the context.
+ * mid-conversation session over to Bedrock and needs it to have the context.
  */
 export const createAgentWithHistory = (
-  ai: GoogleGenAI,
   basePrompt: string,
   userProfile: UserProfile,
   history: Content[],
-): Chat => {
+): ChatLike => {
   const systemInstruction = buildSystemInstruction(basePrompt, userProfile);
-
-  return ai.chats.create({
-    model: "gemini-flash-lite-latest",
-    config: {
-      systemInstruction,
-      temperature: 0.3,
-    },
-    history,
-  });
+  return createBedrockAgent(systemInstruction, history);
 };
