@@ -108,7 +108,15 @@ class HybridChat implements ChatLike {
       return { text };
     } catch (err) {
       console.warn("Ollama request failed, falling back to Bedrock for the rest of this session:", err);
-      this.history = [...this.history, { role: "user" as const, content: userText }];
+      // Deliberately do NOT append the just-failed user turn to this.history
+      // here. fallbackToBedrock() seeds a new BedrockChat from this.history
+      // via toBedrockHistory() and then immediately sends this same `message`
+      // as a live request (which appends its own "user" entry) -- if we'd
+      // already appended a "user" entry above, the seed history would end in
+      // two consecutive "user" entries, violating Bedrock Converse's required
+      // strict user/assistant alternation and breaking every subsequent turn
+      // for the rest of the session. this.history should reflect only prior,
+      // already-completed exchanges.
       return { text: await this.fallbackToBedrock(message, ephemeralContext) };
     }
   }
