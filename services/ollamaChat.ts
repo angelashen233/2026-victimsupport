@@ -68,21 +68,21 @@ class HybridChat implements ChatLike {
       .map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
   }
 
-  private async fallbackToBedrock(message: Part[]): Promise<string> {
+  private async fallbackToBedrock(message: Part[], ephemeralContext?: string): Promise<string> {
     if (!this.bedrockChat) {
       // Hand off with whatever context was already gathered locally, so switching
       // backends mid-conversation doesn't lose the thread.
       this.bedrockChat = this.buildBedrockChat(this.toBedrockHistory());
     }
-    const response = await this.bedrockChat.sendMessage({ message });
+    const response = await this.bedrockChat.sendMessage({ message, ephemeralContext });
     return response.text ?? "";
   }
 
-  async sendMessage({ message }: { message: Part[] }): Promise<{ text: string }> {
+  async sendMessage({ message, ephemeralContext }: { message: Part[]; ephemeralContext?: string }): Promise<{ text: string }> {
     // Once we've fallen back for this session, stay on Bedrock — Ollama history
     // and Bedrock history have diverged and reconciling them isn't worth it.
     if (this.bedrockChat) {
-      return { text: await this.fallbackToBedrock(message) };
+      return { text: await this.fallbackToBedrock(message, ephemeralContext) };
     }
 
     const userText = partsToText(message);
@@ -93,19 +93,23 @@ class HybridChat implements ChatLike {
       // Bedrock, which at least acknowledges the photo instead of silently
       // dropping it (see services/bedrockChat.ts).
       console.warn("Local model can't process images — using Bedrock for this message.");
-      return { text: await this.fallbackToBedrock(message) };
+      return { text: await this.fallbackToBedrock(message, ephemeralContext) };
     }
 
-    const attempt = [...this.history, { role: "user" as const, content: userText }];
+    // ephemeralContext is appended for THIS request only, same as the Bedrock
+    // path — persisted history keeps just the real message text, not the
+    // live hospital/resource data resent every turn.
+    const requestText = ephemeralContext ? `${userText}\n${ephemeralContext}` : userText;
+    const attempt = [...this.history, { role: "user" as const, content: requestText }];
 
     try {
       const text = await ollamaChatCompletion(attempt);
-      this.history = [...attempt, { role: "assistant" as const, content: text }];
+      this.history = [...this.history, { role: "user" as const, content: userText }, { role: "assistant" as const, content: text }];
       return { text };
     } catch (err) {
       console.warn("Ollama request failed, falling back to Bedrock for the rest of this session:", err);
-      this.history = attempt;
-      return { text: await this.fallbackToBedrock(message) };
+      this.history = [...this.history, { role: "user" as const, content: userText }];
+      return { text: await this.fallbackToBedrock(message, ephemeralContext) };
     }
   }
 }

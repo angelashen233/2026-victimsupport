@@ -2,16 +2,22 @@ import type { Content, Part } from "@google/genai";
 import type { UserProfile } from "../types";
 import { createBedrockAgent } from "./bedrockChat";
 
-// Minimal structural interface both the real Gemini `Chat` and the local-model
-// fallback wrapper (services/ollamaChat.ts) satisfy, so callers don't need to
-// know which one they got.
+// Minimal structural interface both the Bedrock-backed chat (services/bedrockChat.ts)
+// and the local-model fallback wrapper (services/ollamaChat.ts) satisfy, so callers
+// don't need to know which one they got.
 export interface ChatLike {
-  sendMessage(params: { message: Part[] }): Promise<{ text?: string }>;
+  // `ephemeralContext` carries state that must be visible to the model THIS
+  // turn (live hospital/resource data, current timestamp) but must never be
+  // persisted into conversation history — history is resent on every call,
+  // so anything stored there compounds every turn. Implementations must
+  // include it in the request sent to the model but exclude it from what
+  // gets remembered for next turn.
+  sendMessage(params: { message: Part[]; ephemeralContext?: string }): Promise<{ text?: string }>;
 }
 
 // =============================================================================
 // REFERENCE: Partner Organizations & Support Resources
-// Add new organizations here AND in services/geminiService.ts (vancouverResources,
+// Add new organizations here AND in services/reportService.ts (vancouverResources,
 // ubcResources, or sfuResources arrays) so the AI surfaces them to users.
 //
 // BC GOVERNMENT RESOURCES FOR VICTIMS OF SEXUAL ASSAULT

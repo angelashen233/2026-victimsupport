@@ -326,14 +326,20 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         // several prompts (e.g. INFO_PROMPT's resource open/closed filtering) depend on
         // this being the actual current time, which matters for conversations that run
         // long enough to cross an hour boundary.
+        // Passed as `ephemeralContext` rather than folded into `parts` so
+        // implementations (see services/bedrockChat.ts) can include it in
+        // this request without persisting it into conversation history —
+        // history is resent every turn, so anything stored there compounds
+        // indefinitely and previously blew past Bedrock's context window
+        // after just 1-2 turns.
         const timeContext = `\n---\nCurrent date/time (Vancouver, PT): ${formatVancouverTimestamp()}\n---`;
-        parts.push({ text: timeContext + liveContext });
+        const ephemeralContext = timeContext + liveContext;
 
         let responseText: string;
 
         // Always run the manager first to route every message to the right agent.
         if (!chats.manager) throw new Error("Manager agent not initialized.");
-        const routerResult = await chats.manager.sendMessage({ message: parts });
+        const routerResult = await chats.manager.sendMessage({ message: parts, ephemeralContext });
         const route = (routerResult.text ?? '').trim();
 
         let nextAgent: AgentType = 'info';
@@ -351,7 +357,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         setActiveAgent(nextAgent);
 
         if (!nextAgentChat) throw new Error(`No agent available — all chat refs are null. Check API key and initialization.`);
-        const agentResponse = await nextAgentChat.sendMessage({ message: parts });
+        const agentResponse = await nextAgentChat.sendMessage({ message: parts, ephemeralContext });
         responseText = agentResponse.text ?? '';
       
         // Parse for quick replies
