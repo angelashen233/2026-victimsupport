@@ -1,5 +1,6 @@
 import { corsHeaders, isAllowedOrigin } from './cors.js';
 import { checkRateLimit } from './rateLimit.js';
+import { handleChat } from './chatHandler.js';
 
 export default {
   async fetch(request, env) {
@@ -28,13 +29,16 @@ export default {
     }
 
     const url = new URL(request.url);
-    if (url.pathname === '/') {
-      return new Response('ok', { status: 200, headers });
+    let response;
+    if (url.pathname === '/api/chat' && request.method === 'POST') {
+      response = await handleChat(request, env);
+    } else {
+      response = new Response(JSON.stringify({ error: 'Not found' }), { status: 404 });
     }
 
-    return new Response(JSON.stringify({ error: 'Not found' }), {
-      status: 404,
-      headers: { 'Content-Type': 'application/json', ...headers },
-    });
+    const responseHeaders = new Headers(response.headers);
+    for (const [k, v] of Object.entries(headers)) responseHeaders.set(k, v);
+    if (!responseHeaders.has('Content-Type')) responseHeaders.set('Content-Type', 'application/json');
+    return new Response(response.body, { status: response.status, headers: responseHeaders });
   },
 };
