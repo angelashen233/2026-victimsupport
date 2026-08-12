@@ -2,6 +2,7 @@ import { converse } from './bedrock.js';
 import { trimHistoryToBudget } from './tokenBudget.js';
 
 function partToConverseContent(part) {
+  if (!part || typeof part !== 'object') return null; // malformed entry -- filtered out below
   if (typeof part.text === 'string') return { text: part.text };
   return null; // image parts are stripped client-side before reaching this worker
 }
