@@ -338,8 +338,14 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         let responseText: string;
 
         // Always run the manager first to route every message to the right agent.
+        // Deliberately omit ephemeralContext here: the manager's only job is to
+        // emit one classification tag, and MANAGER_PROMPT already gets the
+        // user's location from the system prompt's USER CONTEXT section. It
+        // doesn't need the hospital-data block, and including it was a
+        // plausible cause of the observed bias toward misrouting to [MAP] --
+        // as well as wasted tokens on every single turn.
         if (!chats.manager) throw new Error("Manager agent not initialized.");
-        const routerResult = await chats.manager.sendMessage({ message: parts, ephemeralContext });
+        const routerResult = await chats.manager.sendMessage({ message: parts });
         const route = (routerResult.text ?? '').trim();
 
         let nextAgent: AgentType = 'info';
