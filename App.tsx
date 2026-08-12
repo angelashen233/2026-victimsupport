@@ -11,7 +11,7 @@ import WaitTimeMenu from './components/WaitTimeMenu';
 import { initialUserProfile } from './data/userProfile';
 import type { ChatLike } from './services/agents';
 import { buildSystemInstruction, createAgent, createAgentWithHistory, INFO_PROMPT, LOCATION_PROMPT, MANAGER_PROMPT, OFFTOPIC_PROMPT } from './services/agents';
-import { generateReport, generateResources } from './services/geminiService';
+import { generateReport, generateResources } from './services/reportService';
 import { createHybridAgent, isOllamaAvailable, OLLAMA_MODEL } from './services/ollamaChat';
 import type { Message, Recipient, ReportData, Resource, UserProfile } from './types';
 import { MessageAuthor } from './types';
@@ -240,10 +240,6 @@ const App: React.FC = () => {
 
   // ── Start chat ─────────────────────────────────────────────
   const handleStartChat = useCallback((prompt?: string) => {
-    if (!aiRef.current) {
-      setError('AI service is not available. Please check your API key and refresh.');
-      return;
-    }
     if (prompt) setInitialPrompt(prompt);
 
     try {
@@ -253,15 +249,14 @@ const App: React.FC = () => {
       // copy of liveContext on every message, which is what actually keeps
       // the AI's hospital/resource data current through the whole session.
       const userProfileWithHospitals = { ...userProfile, hospitalData };
-      const ai = aiRef.current;
 
-      // Dev-only: route through the local Ollama model, falling back to Gemini
+      // Dev-only: route through the local Ollama model, falling back to Bedrock
       // mid-session if it's unavailable or errors. See services/ollamaChat.ts.
       const makeAgent = (basePrompt: string): ChatLike => {
-        if (!useLocalModelRef.current) return createAgent(ai, basePrompt, userProfileWithHospitals);
+        if (!useLocalModelRef.current) return createAgent(basePrompt, userProfileWithHospitals);
         return createHybridAgent(
           buildSystemInstruction(basePrompt, userProfileWithHospitals),
-          history => createAgentWithHistory(ai, basePrompt, userProfileWithHospitals, history),
+          history => createAgentWithHistory(basePrompt, userProfileWithHospitals, history),
         );
       };
 
@@ -289,8 +284,7 @@ const App: React.FC = () => {
     setIsGeneratingReport(true);
     setError(null);
     try {
-      if (!aiRef.current) throw new Error('AI not initialized');
-      const result = await generateReport(aiRef.current, messages, userProfile);
+      const result = await generateReport(messages, userProfile);
       setReportData(result.report);
       setRecipients(result.recipients);
       setAppState('report');
@@ -307,8 +301,7 @@ const App: React.FC = () => {
     setIsGeneratingResources(true);
     setError(null);
     try {
-      if (!aiRef.current) throw new Error('AI not initialized');
-      const result = await generateResources(aiRef.current, messages, userProfile);
+      const result = await generateResources(messages, userProfile);
       setResources(result.resources);
       setAppState('resources');
     } catch (e) {
