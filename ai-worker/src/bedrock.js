@@ -28,5 +28,15 @@ export async function converse(env, { system, messages, temperature = 0.3, maxTo
   const data = await res.json();
   const textBlock = data?.output?.message?.content?.find(c => typeof c.text === 'string');
   if (!textBlock) throw new Error('Bedrock response missing text content');
+
+  // Diagnostic-only: at maxTokens: 1024 (chat) / 2048 (structured), a reply
+  // containing resource lists plus marker syntax like [COLLAPSIBLE_START]
+  // or [QUICK_REPLIES: ...] can get cut off mid-structure. That was
+  // previously silent -- surface it in the Worker logs so it's visible via
+  // wrangler tail instead of looking like a random model quirk.
+  if (data?.stopReason === 'max_tokens') {
+    console.warn('Bedrock response truncated (stopReason: max_tokens)');
+  }
+
   return textBlock.text;
 }
