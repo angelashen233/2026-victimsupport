@@ -1,4 +1,5 @@
 import { converse } from './bedrock.js';
+import { trimHistoryToBudget } from './tokenBudget.js';
 
 function partToConverseContent(part) {
   if (typeof part.text === 'string') return { text: part.text };
@@ -37,10 +38,16 @@ export async function handleChat(request, env) {
     return new Response(JSON.stringify({ error: 'Invalid request body' }), { status: 400 });
   }
 
-  const messages = [
-    ...(Array.isArray(history) ? history.map(contentToConverseMessage) : []),
-    { role: 'user', content: message.map(partToConverseContent).filter(Boolean) },
-  ];
+  const mappedHistory = Array.isArray(history) ? history.map(contentToConverseMessage) : [];
+  const currentMessage = { role: 'user', content: message.map(partToConverseContent).filter(Boolean) };
+
+  // Server-side backstop: trims history to fit Bedrock's real context window
+  // regardless of what a client sends (client-side caps like
+  // services/bedrockChat.ts's MAX_HISTORY_ENTRIES reduce how often this
+  // triggers, but this public, billed endpoint can't rely on the client
+  // behaving).
+  const trimmedHistory = trimHistoryToBudget(systemInstruction, mappedHistory, currentMessage, 1024);
+  const messages = [...trimmedHistory, currentMessage];
 
   try {
     const text = await converse(env, {
