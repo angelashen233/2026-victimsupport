@@ -1,5 +1,10 @@
 const WINDOW_SECONDS = 60;
-const MAX_REQUESTS_PER_WINDOW = 20;
+// Every user turn costs 2 Worker calls (manager classification + the
+// answering agent), so this is ~20 user messages/minute/IP, not ~40 --
+// bumped from 20 (which was really only ~10 messages/minute) to restore
+// the originally-intended limit. This app's target users (campus/shelter
+// networks) often share one egress IP across many people.
+const MAX_REQUESTS_PER_WINDOW = 40;
 
 // Best-effort fixed-window counter: reads then writes without atomicity,
 // so concurrent requests landing in the same window can slightly

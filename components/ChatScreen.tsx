@@ -396,7 +396,11 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
         setMessages(prev => [...prev, aiMessage]);
     } catch (e: any) {
         console.error("sendMessageToAI error:", e);
-        setError(`Error: ${e?.message ?? String(e)}`);
+        // Show a calm, generic message rather than the raw error text (e.g.
+        // "Error: AI worker responded 429") -- confusing/alarming for
+        // someone in this app's target situation. The real error is still
+        // logged above for debugging.
+        setError("I'm having trouble responding right now. Please wait a moment and try again.");
     } finally {
         setIsThinking(false);
         setIsWriting(false);
