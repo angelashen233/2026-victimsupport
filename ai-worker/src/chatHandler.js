@@ -6,9 +6,10 @@ function partToConverseContent(part) {
 }
 
 function contentToConverseMessage(content) {
+  const parts = Array.isArray(content.parts) ? content.parts : [];
   return {
     role: content.role === 'model' ? 'assistant' : 'user',
-    content: content.parts.map(partToConverseContent).filter(Boolean),
+    content: parts.map(partToConverseContent).filter(Boolean),
   };
 }
 
@@ -20,8 +21,19 @@ export async function handleChat(request, env) {
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400 });
   }
 
+  if (typeof body !== 'object' || body === null) {
+    return new Response(JSON.stringify({ error: 'Invalid request body' }), { status: 400 });
+  }
+
   const { systemInstruction, history, message } = body;
   if (typeof systemInstruction !== 'string' || !Array.isArray(message)) {
+    return new Response(JSON.stringify({ error: 'Invalid request body' }), { status: 400 });
+  }
+
+  if (
+    Array.isArray(history) &&
+    !history.every(c => c && typeof c === 'object' && Array.isArray(c.parts))
+  ) {
     return new Response(JSON.stringify({ error: 'Invalid request body' }), { status: 400 });
   }
 
