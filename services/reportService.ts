@@ -11,7 +11,13 @@ async function generateStructured<T>(prompt: string, schema: string): Promise<T>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, schema }),
     });
-    if (!res.ok) throw new Error('The AI returned an invalid report format. Please try again.');
+    if (!res.ok) {
+        // Surface the worker's own message when it sent one (e.g. the
+        // "conversation is too long" guard in structuredHandler.js) so the
+        // user sees an actionable reason instead of a generic fallback.
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || 'The AI returned an invalid report format. Please try again.');
+    }
     return res.json();
 }
 
@@ -34,9 +40,20 @@ const RESOURCE_SCHEMA = `{
   ]
 }`;
 
+// Same class of bug as the chat-context overflow fixed in Task 14-15: the
+// full message history was being serialized into the report prompt with no
+// cap, so a conversation of meaningful length (which this app is designed
+// to support) would exceed /api/structured's ~6,100-token input headroom
+// and fail. Cap to the most recent messages before joining -- 30 is
+// generous enough to still produce a good report while keeping the prompt
+// bounded; a server-side guard in ai-worker/src/structuredHandler.js
+// backstops this against any client that skips this cap.
+const MAX_REPORT_HISTORY_MESSAGES = 30;
+
 export const generateReport = async (messages: Message[], userProfile: UserProfile): Promise<{ report: ReportData; recipients: Recipient[] }> => {
     const chatHistory = messages
         .filter(m => m.author !== MessageAuthor.AI || !m.text.startsWith("Hello. I'm here to listen")) // Filter out initial greeting
+        .slice(-MAX_REPORT_HISTORY_MESSAGES)
         .map(m => `${m.author === MessageAuthor.USER ? 'Person' : 'Assistant'}: ${m.text} ${m.image ? '[User provided an image]' : ''}`)
         .join('\n');
 
@@ -51,8 +68,11 @@ Based on the following conversation, extract the relevant details and structure 
 };
 
 export const generateResources = async (messages: Message[], userProfile: UserProfile): Promise<{ resources: Resource[] }> => {
+    // Same cap as generateReport above, same reason: bound the prompt sent
+    // to /api/structured regardless of how long the conversation ran.
     const chatHistory = messages
         .filter(m => m.author !== MessageAuthor.AI || !m.text.startsWith("Hello. I'm here to listen"))
+        .slice(-MAX_REPORT_HISTORY_MESSAGES)
         .map(m => `${m.author === MessageAuthor.USER ? 'Person' : 'Assistant'}: ${m.text}`)
         .join('\n');
 

@@ -1,7 +1,15 @@
 import { converse } from './bedrock.js';
+import { estimateTokens } from './tokenBudget.js';
 
 const JSON_SYSTEM_PROMPT =
   'You are a precise JSON-generation assistant. Always respond with a single valid JSON object only -- no prose, no markdown code fences, no explanation.';
+
+const STRUCTURED_MAX_TOKENS = 2048;
+const SAFETY_MARGIN_TOKENS = 200;
+// Simple guard, not a truncation -- if the estimated prompt+schema exceeds
+// this, reject early with a clear reason rather than attempting a call that
+// will fail with a confusing 502 partway through someone's disclosure.
+const MAX_PROMPT_TOKENS = 8192 - STRUCTURED_MAX_TOKENS - SAFETY_MARGIN_TOKENS - estimateTokens(JSON_SYSTEM_PROMPT);
 
 function extractJson(text) {
   const match = text.match(/\{[\s\S]*\}/);
@@ -27,6 +35,16 @@ export async function handleStructured(request, env) {
   }
 
   const firstPrompt = `${prompt}\n\nRespond with ONLY a single JSON object matching this shape, and no other text:\n${schema}`;
+
+  if (estimateTokens(firstPrompt) > MAX_PROMPT_TOKENS) {
+    return new Response(
+      JSON.stringify({
+        error: 'This conversation is too long to generate a report from all at once. Try generating it earlier, or in a shorter session.',
+      }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+
   const messages = [{ role: 'user', content: [{ text: firstPrompt }] }];
 
   try {
