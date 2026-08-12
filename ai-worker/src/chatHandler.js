@@ -62,6 +62,7 @@ export async function handleChat(request, env) {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (err) {
+    console.error('chat: Bedrock request failed', err);
     return new Response(JSON.stringify({ error: 'Bedrock request failed' }), {
       status: 502,
       headers: { 'Content-Type': 'application/json' },

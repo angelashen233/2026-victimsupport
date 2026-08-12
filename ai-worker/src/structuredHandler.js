@@ -83,6 +83,7 @@ export async function handleStructured(request, env) {
       });
     }
   } catch (err) {
+    console.error('structured: Bedrock request failed', err);
     return new Response(
       JSON.stringify({ error: 'The AI returned an invalid report format. Please try again.' }),
       { status: 502, headers: { 'Content-Type': 'application/json' } },
