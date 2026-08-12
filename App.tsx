@@ -205,8 +205,20 @@ const App: React.FC = () => {
     open247: !!h.open247,
   }));
 
+  // Capped to the nearest few before being embedded in every outgoing chat
+  // message — the full list (dozens of hospitals from the wait-times API)
+  // was blowing past Bedrock's 8192-token context window within 1-2 turns.
+  // MAP_PROMPT only ever needs the primary recommendation plus a couple of
+  // alternates for its "other nearby hospitals" section, so this doesn't
+  // lose anything the prompts actually use. `victimSupportContext` below is
+  // deliberately left uncapped — it's already small (~10 entries) and is
+  // safety-critical crisis/support data, unlike the much larger hospital list.
+  const HOSPITAL_CONTEXT_LIMIT = 5;
   const hospitalContext = hospitalData.length > 0
-    ? '\n---\nHOSPITALS (pre-sorted nearest first, index 0 = closest). Use index 0 as the primary recommendation:\n' + JSON.stringify(hospitalData, null, 2) + '\n---'
+    ? '\n---\nHOSPITALS (pre-sorted nearest first, index 0 = closest, showing nearest ' +
+      Math.min(HOSPITAL_CONTEXT_LIMIT, hospitalData.length) + ' of ' + hospitalData.length +
+      '). Use index 0 as the primary recommendation:\n' +
+      JSON.stringify(hospitalData.slice(0, HOSPITAL_CONTEXT_LIMIT), null, 2) + '\n---'
     : '';
 
   const victimSupportContext = useMemo(() => {
