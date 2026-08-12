@@ -1713,3 +1713,379 @@ Run: `npm run dev` (leave running)
 Set `VITE_ENABLE_LOCAL_MODEL=true` in `.env.local`, run `ollama pull llama3.2:1b` and start Ollama locally, restart `npm run dev`, and repeat a chat exchange — confirm replies come from the local model (check the console info log), and that stopping Ollama mid-session causes a fallback to the Bedrock-backed path rather than an error.
 
 - [ ] **Step 6: No commit for this task** — it's verification only. If any step fails, go back to the relevant earlier task and fix it there (with its own commit), rather than patching ad hoc here.
+
+---
+
+## Addendum: context-overflow fix (Tasks 14-16)
+
+Task 13's live verification against real Bedrock found a reproducible, high-severity bug: multi-turn chat reliably returns HTTP 502 starting with the 2nd message in a session. Root cause, confirmed via a temporary diagnostic log against real Bedrock: `App.tsx`/`ChatScreen.tsx` embed live hospital data (unfiltered — all of them, not just the nearest few) and victim-support-resource data into every outgoing chat message, on every turn, to every agent — and each chat's `BedrockChat` instance additionally re-stores that same context-laden text into its own conversation history every turn, compounding it turn over turn. Combined with the system prompts, this blows past Llama 3 8B Instruct's 8,192-token context window (Gemini's much larger window meant this never surfaced before). The human partner reviewed this finding and approved fixing it by trimming context, while keeping the `ca-central-1` / Llama 3 8B Instruct choice (data residency intact).
+
+Numeric capping alone isn't sufficient here — the fix must also stop persisting the live-context text into conversation history, otherwise each remembered turn keeps re-embedding a full copy of it and the budget is blown again after a couple of turns regardless of how small any single turn's context is. Task 14 caps the numbers; Task 15 stops the compounding; Task 16 re-verifies against real Bedrock.
+
+### Task 14: Cap hospital context size in App.tsx
+
+**Files:**
+- Modify: `App.tsx`
+
+**Interfaces:**
+- No signature changes — `hospitalContext` (a plain string, already consumed by `liveContext` in `App.tsx` and passed down to `ChatScreen.tsx`) just becomes shorter.
+
+- [ ] **Step 1: Cap `hospitalContext` to the nearest few hospitals**
+
+In `App.tsx`, replace:
+
+```typescript
+  const hospitalContext = hospitalData.length > 0
+    ? '\n---\nHOSPITALS (pre-sorted nearest first, index 0 = closest). Use index 0 as the primary recommendation:\n' + JSON.stringify(hospitalData, null, 2) + '\n---'
+    : '';
+```
+
+with:
+
+```typescript
+  // Capped to the nearest few before being embedded in every outgoing chat
+  // message — the full list (dozens of hospitals from the wait-times API)
+  // was blowing past Bedrock's 8192-token context window within 1-2 turns.
+  // MAP_PROMPT only ever needs the primary recommendation plus a couple of
+  // alternates for its "other nearby hospitals" section, so this doesn't
+  // lose anything the prompts actually use. `victimSupportContext` below is
+  // deliberately left uncapped — it's already small (~10 entries) and is
+  // safety-critical crisis/support data, unlike the much larger hospital list.
+  const HOSPITAL_CONTEXT_LIMIT = 5;
+  const hospitalContext = hospitalData.length > 0
+    ? '\n---\nHOSPITALS (pre-sorted nearest first, index 0 = closest, showing nearest ' +
+      Math.min(HOSPITAL_CONTEXT_LIMIT, hospitalData.length) + ' of ' + hospitalData.length +
+      '). Use index 0 as the primary recommendation:\n' +
+      JSON.stringify(hospitalData.slice(0, HOSPITAL_CONTEXT_LIMIT), null, 2) + '\n---'
+    : '';
+```
+
+Note: `hospitalData` itself (the full, uncapped array) is left untouched — it's also used to build `userProfileWithHospitals` elsewhere in `App.tsx`, which isn't part of what gets sent to the model. Only the JSON embedded in `hospitalContext` (the text actually sent to Bedrock) is capped.
+
+- [ ] **Step 2: Verify the app still builds**
+
+Run: `npm run build`
+Expected: succeeds with zero errors (same as after Task 11).
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add App.tsx
+git commit -m "Cap hospital context sent to chat agents to nearest 5"
+```
+
+---
+
+### Task 15: Stop persisting ephemeral live-context into chat history
+
+**Files:**
+- Modify: `services/agents.ts`
+- Modify: `services/bedrockChat.ts`
+- Modify: `services/ollamaChat.ts`
+- Modify: `components/ChatScreen.tsx`
+
+**Interfaces:**
+- `ChatLike.sendMessage` gains an optional second field: `sendMessage(params: { message: Part[]; ephemeralContext?: string }): Promise<{ text?: string }>`. `ephemeralContext` must be included in the request sent to the model for the current turn, but must NOT be persisted into whatever conversation history the implementation keeps for subsequent turns.
+- Consumed by: `components/ChatScreen.tsx`'s two `sendMessage` call sites (Task 15 also updates these).
+
+- [ ] **Step 1: Widen the `ChatLike` interface in `services/agents.ts`**
+
+Replace:
+
+```typescript
+// Minimal structural interface both the real Gemini `Chat` and the local-model
+// fallback wrapper (services/ollamaChat.ts) satisfy, so callers don't need to
+// know which one they got.
+export interface ChatLike {
+  sendMessage(params: { message: Part[] }): Promise<{ text?: string }>;
+}
+```
+
+with:
+
+```typescript
+// Minimal structural interface both the Bedrock-backed chat (services/bedrockChat.ts)
+// and the local-model fallback wrapper (services/ollamaChat.ts) satisfy, so callers
+// don't need to know which one they got.
+export interface ChatLike {
+  // `ephemeralContext` carries state that must be visible to the model THIS
+  // turn (live hospital/resource data, current timestamp) but must never be
+  // persisted into conversation history — history is resent on every call,
+  // so anything stored there compounds every turn. Implementations must
+  // include it in the request sent to the model but exclude it from what
+  // gets remembered for next turn.
+  sendMessage(params: { message: Part[]; ephemeralContext?: string }): Promise<{ text?: string }>;
+}
+```
+
+Also fix a stale comment a few lines below (still references the file Task 10 renamed away from) — replace:
+
+```typescript
+// Add new organizations here AND in services/geminiService.ts (vancouverResources,
+```
+
+with:
+
+```typescript
+// Add new organizations here AND in services/reportService.ts (vancouverResources,
+```
+
+- [ ] **Step 2: Update `services/bedrockChat.ts` to thread and exclude `ephemeralContext`**
+
+Replace the full file with:
+
+```typescript
+import type { Content, Part } from "@google/genai";
+import type { ChatLike } from "./agents";
+import { partsToText, partsHaveImage } from "./parts";
+
+const AI_WORKER_URL = import.meta.env.VITE_AI_WORKER_URL as string | undefined;
+
+const IMAGE_UNAVAILABLE_NOTE =
+  "\n\n[The user attached a photo, but this AI can't view images. Gently ask them to describe what it shows.]";
+
+// Live hospital/resource context is resent on every turn (see ChatScreen.tsx's
+// `ephemeralContext`) and would otherwise compound without bound if stored in
+// history — capping to a small number of real exchanges keeps token usage
+// predictable regardless of how long the conversation runs.
+const MAX_HISTORY_ENTRIES = 8;
+
+async function chatCompletion(systemInstruction: string, history: Content[], message: Part[]): Promise<string> {
+  if (!AI_WORKER_URL) throw new Error("VITE_AI_WORKER_URL is not configured");
+
+  const res = await fetch(`${AI_WORKER_URL}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ systemInstruction, history, message }),
+  });
+  if (!res.ok) throw new Error(`AI worker responded ${res.status}`);
+
+  const data = await res.json();
+  if (typeof data?.text !== "string") throw new Error("AI worker response missing text");
+  return data.text;
+}
+
+class BedrockChat implements ChatLike {
+  private history: Content[];
+
+  constructor(private systemInstruction: string, seedHistory: Content[] = []) {
+    this.history = seedHistory;
+  }
+
+  async sendMessage({ message, ephemeralContext }: { message: Part[]; ephemeralContext?: string }): Promise<{ text: string }> {
+    // Llama 3 8B Instruct is text-only — if a photo is attached, drop the
+    // image data (never sent over the network) and let the model know it's
+    // there so it can ask the user to describe it, rather than silently
+    // responding as if no image existed.
+    const outgoing: Part[] = partsHaveImage(message)
+      ? [{ text: partsToText(message) + IMAGE_UNAVAILABLE_NOTE }]
+      : message;
+
+    // ephemeralContext (live hospital/resource data, current timestamp) is
+    // appended for THIS request only — it's deliberately excluded from what
+    // gets stored in `this.history` below, so it doesn't get resent (and
+    // compounded) on every subsequent turn.
+    const requestParts: Part[] = ephemeralContext
+      ? [...outgoing, { text: ephemeralContext }]
+      : outgoing;
+
+    const text = await chatCompletion(this.systemInstruction, this.history, requestParts);
+
+    this.history = [
+      ...this.history,
+      { role: "user", parts: outgoing },
+      { role: "model", parts: [{ text }] },
+    ].slice(-MAX_HISTORY_ENTRIES);
+
+    return { text };
+  }
+}
+
+export const createBedrockAgent = (systemInstruction: string, seedHistory: Content[] = []): ChatLike =>
+  new BedrockChat(systemInstruction, seedHistory);
+```
+
+- [ ] **Step 3: Update `services/ollamaChat.ts` to thread `ephemeralContext` through, without persisting it**
+
+Replace:
+
+```typescript
+  private async fallbackToBedrock(message: Part[]): Promise<string> {
+    if (!this.bedrockChat) {
+      // Hand off with whatever context was already gathered locally, so switching
+      // backends mid-conversation doesn't lose the thread.
+      this.bedrockChat = this.buildBedrockChat(this.toBedrockHistory());
+    }
+    const response = await this.bedrockChat.sendMessage({ message });
+    return response.text ?? "";
+  }
+
+  async sendMessage({ message }: { message: Part[] }): Promise<{ text: string }> {
+    // Once we've fallen back for this session, stay on Bedrock — Ollama history
+    // and Bedrock history have diverged and reconciling them isn't worth it.
+    if (this.bedrockChat) {
+      return { text: await this.fallbackToBedrock(message) };
+    }
+
+    const userText = partsToText(message);
+
+    if (partsHaveImage(message)) {
+      // Ollama's local model can't process images either way (only the text
+      // portion of `message` ever reaches it below), so route straight to
+      // Bedrock, which at least acknowledges the photo instead of silently
+      // dropping it (see services/bedrockChat.ts).
+      console.warn("Local model can't process images — using Bedrock for this message.");
+      return { text: await this.fallbackToBedrock(message) };
+    }
+
+    const attempt = [...this.history, { role: "user" as const, content: userText }];
+
+    try {
+      const text = await ollamaChatCompletion(attempt);
+      this.history = [...attempt, { role: "assistant" as const, content: text }];
+      return { text };
+    } catch (err) {
+      console.warn("Ollama request failed, falling back to Bedrock for the rest of this session:", err);
+      this.history = attempt;
+      return { text: await this.fallbackToBedrock(message) };
+    }
+  }
+```
+
+with:
+
+```typescript
+  private async fallbackToBedrock(message: Part[], ephemeralContext?: string): Promise<string> {
+    if (!this.bedrockChat) {
+      // Hand off with whatever context was already gathered locally, so switching
+      // backends mid-conversation doesn't lose the thread.
+      this.bedrockChat = this.buildBedrockChat(this.toBedrockHistory());
+    }
+    const response = await this.bedrockChat.sendMessage({ message, ephemeralContext });
+    return response.text ?? "";
+  }
+
+  async sendMessage({ message, ephemeralContext }: { message: Part[]; ephemeralContext?: string }): Promise<{ text: string }> {
+    // Once we've fallen back for this session, stay on Bedrock — Ollama history
+    // and Bedrock history have diverged and reconciling them isn't worth it.
+    if (this.bedrockChat) {
+      return { text: await this.fallbackToBedrock(message, ephemeralContext) };
+    }
+
+    const userText = partsToText(message);
+
+    if (partsHaveImage(message)) {
+      // Ollama's local model can't process images either way (only the text
+      // portion of `message` ever reaches it below), so route straight to
+      // Bedrock, which at least acknowledges the photo instead of silently
+      // dropping it (see services/bedrockChat.ts).
+      console.warn("Local model can't process images — using Bedrock for this message.");
+      return { text: await this.fallbackToBedrock(message, ephemeralContext) };
+    }
+
+    // ephemeralContext is appended for THIS request only, same as the Bedrock
+    // path — persisted history keeps just the real message text, not the
+    // live hospital/resource data resent every turn.
+    const requestText = ephemeralContext ? `${userText}\n${ephemeralContext}` : userText;
+    const attempt = [...this.history, { role: "user" as const, content: requestText }];
+
+    try {
+      const text = await ollamaChatCompletion(attempt);
+      this.history = [...this.history, { role: "user" as const, content: userText }, { role: "assistant" as const, content: text }];
+      return { text };
+    } catch (err) {
+      console.warn("Ollama request failed, falling back to Bedrock for the rest of this session:", err);
+      this.history = [...this.history, { role: "user" as const, content: userText }];
+      return { text: await this.fallbackToBedrock(message, ephemeralContext) };
+    }
+  }
+```
+
+Note this fixes the identical compounding-context bug for the dev-only Ollama fallback path too (it had the same flaw, just gated behind `VITE_ENABLE_LOCAL_MODEL` which defaults off) — `MAX_HISTORY_ENTRIES`-style capping for the Ollama-local history itself is deliberately NOT added here; that's out of scope for this fix (it's not the reported production bug, and local Ollama models are typically configured with much larger context windows).
+
+- [ ] **Step 4: Update `components/ChatScreen.tsx` to pass `ephemeralContext` separately instead of bundling it into `parts`**
+
+Replace:
+
+```typescript
+        const timeContext = `\n---\nCurrent date/time (Vancouver, PT): ${formatVancouverTimestamp()}\n---`;
+        parts.push({ text: timeContext + liveContext });
+
+        let responseText: string;
+
+        // Always run the manager first to route every message to the right agent.
+        if (!chats.manager) throw new Error("Manager agent not initialized.");
+        const routerResult = await chats.manager.sendMessage({ message: parts });
+        const route = (routerResult.text ?? '').trim();
+```
+
+with:
+
+```typescript
+        // Passed as `ephemeralContext` rather than folded into `parts` so
+        // implementations (see services/bedrockChat.ts) can include it in
+        // this request without persisting it into conversation history —
+        // history is resent every turn, so anything stored there compounds
+        // indefinitely and previously blew past Bedrock's context window
+        // after just 1-2 turns.
+        const timeContext = `\n---\nCurrent date/time (Vancouver, PT): ${formatVancouverTimestamp()}\n---`;
+        const ephemeralContext = timeContext + liveContext;
+
+        let responseText: string;
+
+        // Always run the manager first to route every message to the right agent.
+        if (!chats.manager) throw new Error("Manager agent not initialized.");
+        const routerResult = await chats.manager.sendMessage({ message: parts, ephemeralContext });
+        const route = (routerResult.text ?? '').trim();
+```
+
+And replace:
+
+```typescript
+        if (!nextAgentChat) throw new Error(`No agent available — all chat refs are null. Check API key and initialization.`);
+        const agentResponse = await nextAgentChat.sendMessage({ message: parts });
+        responseText = agentResponse.text ?? '';
+```
+
+with:
+
+```typescript
+        if (!nextAgentChat) throw new Error(`No agent available — all chat refs are null. Check API key and initialization.`);
+        const agentResponse = await nextAgentChat.sendMessage({ message: parts, ephemeralContext });
+        responseText = agentResponse.text ?? '';
+```
+
+- [ ] **Step 5: Verify the app builds and typechecks**
+
+Run: `npm run build`
+Expected: succeeds with zero errors.
+Run: `npx tsc --noEmit`
+Expected: only the pre-existing `ImportMeta.env` errors (same category/count as after Task 11/12 — not a new category), nothing related to `ChatLike`/`ephemeralContext`.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add services/agents.ts services/bedrockChat.ts services/ollamaChat.ts components/ChatScreen.tsx
+git commit -m "Stop persisting ephemeral live-context into chat history"
+```
+
+---
+
+### Task 16: Re-verify multi-turn chat against real Bedrock
+
+**Files:** none (verification only)
+
+- [ ] **Step 1: Start both dev servers**
+
+`cd ai-worker && npm run dev` (needs `ai-worker/.dev.vars` with real AWS credentials, same as Task 13), and `npm run dev` from the project root, with `.env.local` containing `VITE_AI_WORKER_URL=http://localhost:8787`.
+
+- [ ] **Step 2: Reproduce the original failure is gone**
+
+In a browser, start a chat and send **at least 5 consecutive messages** in the same session (a mix of INFO-agent and MAP-agent-triggering messages, e.g. repeat the scenarios from Task 13's Step 4.2-4.4). Confirm none of them return an error — specifically confirm the request that used to fail around message 2 now succeeds.
+
+- [ ] **Step 3: Re-check the photo-attach flow**
+
+As the 2nd or later message in a session (not the first, to specifically exercise the history-plus-context path), attach a photo and send it. Confirm the reply acknowledges it can't view the photo and asks the user to describe it (Task 13 couldn't verify this because the 502 hit first).
+
+- [ ] **Step 4: No commit for this task** — verification only. If the 502 still reproduces, the context/history budget needs further tightening (e.g. lower `HOSPITAL_CONTEXT_LIMIT` or `MAX_HISTORY_ENTRIES` further) — treat that as a new BLOCKED finding to report, not something to silently patch further without visibility.
+
