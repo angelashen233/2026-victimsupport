@@ -1,6 +1,7 @@
 import { corsHeaders, isAllowedOrigin } from './cors.js';
 import { checkRateLimit } from './rateLimit.js';
 import { handleChat } from './chatHandler.js';
+import { handleStructured } from './structuredHandler.js';
 
 export default {
   async fetch(request, env) {
@@ -32,6 +33,8 @@ export default {
     let response;
     if (url.pathname === '/api/chat' && request.method === 'POST') {
       response = await handleChat(request, env);
+    } else if (url.pathname === '/api/structured' && request.method === 'POST') {
+      response = await handleStructured(request, env);
     } else {
       response = new Response(JSON.stringify({ error: 'Not found' }), { status: 404 });
     }
