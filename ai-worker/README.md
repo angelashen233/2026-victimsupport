@@ -64,6 +64,17 @@ VITE_AI_WORKER_URL=https://ai-worker.<subdomain>.workers.dev
 
 Then rebuild/redeploy the frontend.
 
+**For the GitHub Pages deploy specifically:** `.env.local` only affects
+local dev builds — it's git-ignored and never reaches CI. The
+`deploy.yml` workflow instead reads `VITE_AI_WORKER_URL` from a GitHub
+Actions **repository variable** (not a secret, since this is just a
+public Worker URL, not sensitive). Once `ai-worker` is deployed and you
+have its URL, set it at: repo **Settings → Secrets and variables →
+Actions → Variables tab → New repository variable**, name
+`VITE_AI_WORKER_URL`, value the Worker URL from above. Without this, the
+deployed site's bundle has `VITE_AI_WORKER_URL` undefined and every
+chat/report/resource call fails immediately.
+
 ## Local dev
 
 For `wrangler dev` to reach real Bedrock locally, create `ai-worker/.dev.vars`
