@@ -19,7 +19,5 @@ View your app in AI Studio: https://ai.studio/apps/drive/1pPbWFmG8YTwj7_8r0-tqlP
 2. Deploy `ai-worker/` (see [ai-worker/README.md](ai-worker/README.md)) and set
    `VITE_AI_WORKER_URL` in [.env.local](.env.local) to its URL. This powers chat,
    incident reports, and resource generation via AWS Bedrock.
-3. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key —
-   this is only used for voice chat.
-4. Run the app:
+3. Run the app:
    `npm run dev`

@@ -1,5 +1,5 @@
-import type { Content, Part } from "@google/genai";
 import type { ChatLike } from "./agents";
+import type { Content, Part } from "./parts";
 import { partsToText, partsHaveImage } from "./parts";
 
 // Dev-only: talk to a local Ollama server instead of Bedrock, falling back

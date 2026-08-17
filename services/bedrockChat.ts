@@ -1,5 +1,5 @@
-import type { Content, Part } from "@google/genai";
 import type { ChatLike } from "./agents";
+import type { Content, Part } from "./parts";
 import { partsToText, partsHaveImage } from "./parts";
 
 const AI_WORKER_URL = import.meta.env.VITE_AI_WORKER_URL as string | undefined;
@@ -56,8 +56,8 @@ class BedrockChat implements ChatLike {
 
     this.history = [
       ...this.history,
-      { role: "user", parts: outgoing },
-      { role: "model", parts: [{ text }] },
+      { role: "user" as const, parts: outgoing },
+      { role: "model" as const, parts: [{ text }] },
     ].slice(-MAX_HISTORY_ENTRIES);
 
     return { text };

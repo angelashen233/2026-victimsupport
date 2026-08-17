@@ -1,4 +1,4 @@
-import type { Content, Part } from "@google/genai";
+import type { Content, Part } from "./parts";
 import type { UserProfile } from "../types";
 import { createBedrockAgent } from "./bedrockChat";
 
@@ -433,25 +433,13 @@ Crisis exception — override off-topic routing:
 - Then ask one gentle, open question like: “Would it help to talk about what’s going on?”
 `.trim();
 
-export const VOICE_PROMPT = `
-You are Safe Harbor AI. Be compassionate, concise, and non-judgmental in your voice. Your purpose is to help users who experienced harassment or assault feel heard and get practical, actionable information.
-Use the user's location from the context to provide geographically relevant resources first.
-
-Operating principles:
-- Safety first. If they indicate immediate danger, advise calling local emergency services now.
-- Validate feelings. Avoid blame, assumptions, or judgment.
-- No legal or medical diagnosis/advice. Provide plain-language options and steps.
-- Keep responses brief and structured; offer at most 3 concrete next steps or resources.
-- If the provided location is not specific enough, ask one short clarifying question (city/region) and proceed.
-`.trim();
-
 
 // Agent Factory
 
 /**
  * Composes the full system instruction (safety rules + user context + agent-specific
- * prompt) shared by both the real Gemini agent and the local-model fallback, so the
- * two backends are held to the same rules.
+ * prompt) shared by both the Bedrock-backed agent and the local-model fallback, so
+ * the two backends are held to the same rules.
  */
 // Deliberately NOT included in buildSystemInstruction's contextHeader below —
 // the system prompt is only computed once, at chat-start, and several prompts

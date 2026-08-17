@@ -78,7 +78,7 @@ const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = ({ onAccept, dar
               AI limitations &amp; your responsibility
             </h2>
             <p>
-              This tool is powered by a large language model (Google Gemini). It can make mistakes. Always verify important information independently, particularly around legal options, medical procedures, and reporting timelines. Resources listed may change — contact organizations directly to confirm availability.
+              This tool is powered by a large language model. It can make mistakes. Always verify important information independently, particularly around legal options, medical procedures, and reporting timelines. Resources listed may change — contact organizations directly to confirm availability.
             </p>
           </section>
 

@@ -2,69 +2,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { Message, UserProfile } from '../types';
 import { MessageAuthor } from '../types';
-// FIX: Removed 'LiveSession' which is not an exported member, and aliased 'Blob' to 'GenAIBlob' to avoid conflict with the native DOM Blob type.
-import type { Part, LiveServerMessage, Blob as GenAIBlob, GoogleGenAI } from '@google/genai';
-import { Modality } from '@google/genai';
-import { GenerateReportIcon, SendIcon, UserIcon, BotIcon, AttachmentIcon, CameraIcon, AudioIcon, ResourcesIcon, CompileIcon, MicrophoneIcon, DownloadIcon } from './icons';
+import type { Part } from '../services/parts';
+import { GenerateReportIcon, SendIcon, UserIcon, BotIcon, AttachmentIcon, CameraIcon, AudioIcon, ResourcesIcon, CompileIcon, DownloadIcon } from './icons';
 import type { AgentType } from '../App';
 import type { ChatLike } from '../services/agents';
-import { VOICE_PROMPT, formatVancouverTimestamp } from '../services/agents';
-
-// Voice Chat Audio Helpers
-function decode(base64: string) {
-    const binaryString = atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
-}
-
-async function decodeAudioData(
-    data: Uint8Array,
-    ctx: AudioContext,
-    sampleRate: number,
-    numChannels: number,
-): Promise<AudioBuffer> {
-    const dataInt16 = new Int16Array(data.buffer);
-    const frameCount = dataInt16.length / numChannels;
-    const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-
-    for (let channel = 0; channel < numChannels; channel++) {
-        const channelData = buffer.getChannelData(channel);
-        for (let i = 0; i < frameCount; i++) {
-            channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-        }
-    }
-    return buffer;
-}
-
-function encode(bytes: Uint8Array) {
-    let binary = '';
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-}
-
-// FIX: Use GenAIBlob type alias for the return type.
-function createBlob(data: Float32Array): GenAIBlob {
-    const l = data.length;
-    const int16 = new Int16Array(l);
-    for (let i = 0; i < l; i++) {
-        int16[i] = data[i] * 32768;
-    }
-    return {
-        data: encode(new Uint8Array(int16.buffer)),
-        mimeType: 'audio/pcm;rate=16000',
-    };
-}
-
+import { formatVancouverTimestamp } from '../services/agents';
 
 interface ChatScreenProps {
-    ai: GoogleGenAI | null;
     userProfile: UserProfile;
     messages: Message[];
     setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -198,7 +142,6 @@ const formatMessageText = (text: string): React.ReactNode => {
 
 
 const ChatScreen: React.FC<ChatScreenProps> = ({
-    ai,
     userProfile,
     messages,
     setMessages,
@@ -273,39 +216,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  // Voice chat refs and state
-  const [voiceConnectionStatus, setVoiceConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
-  // FIX: Changed LiveSession to 'any' as it's not an exported type.
-  const liveSessionRef = useRef<Promise<any> | null>(null);
-  const inputAudioContextRef = useRef<AudioContext | null>(null);
-  const outputAudioContextRef = useRef<AudioContext | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const audioProcessorNodeRef = useRef<ScriptProcessorNode | null>(null);
-  const audioSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const outputSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
-  const nextStartTimeRef = useRef<number>(0);
-  const [streamingInput, setStreamingInput] = useState('');
-  const [streamingOutput, setStreamingOutput] = useState('');
-  const [micVolume, setMicVolume] = useState(0);
-  const animationFrameRef = useRef<number | null>(null);
-
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  useEffect(scrollToBottom, [messages, streamingInput, streamingOutput]);
-
-  
-  // Voice Chat Cleanup
-  useEffect(() => {
-    return () => {
-        if (voiceConnectionStatus === 'connected') {
-            stopVoiceChat();
-        }
-    };
-  }, [voiceConnectionStatus]);
+  useEffect(scrollToBottom, [messages]);
 
     const sendMessageToAI = useCallback(async (userMessage: Message) => {
         setIsThinking(true);
@@ -362,7 +278,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
 
         setActiveAgent(nextAgent);
 
-        if (!nextAgentChat) throw new Error(`No agent available — all chat refs are null. Check API key and initialization.`);
+        if (!nextAgentChat) throw new Error(`No agent available — all chat refs are null.`);
         const agentResponse = await nextAgentChat.sendMessage({ message: parts, ephemeralContext });
         responseText = agentResponse.text ?? '';
       
@@ -435,179 +351,6 @@ const ChatScreen: React.FC<ChatScreenProps> = ({
       setMessages(prev => [...prev, userMessage]);
       await sendMessageToAI(userMessage);
   };
-
-  const startVoiceChat = async () => {
-    if (!ai) {
-        setError("AI not initialized.");
-        return;
-    }
-    setVoiceConnectionStatus('connecting');
-    setError(null);
-
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaStreamRef.current = stream;
-
-        // FIX: Cast window to 'any' to allow access to vendor-prefixed 'webkitAudioContext' without TypeScript errors.
-        inputAudioContextRef.current = new ((window as any).AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-        // FIX: Cast window to 'any' to allow access to vendor-prefixed 'webkitAudioContext' without TypeScript errors.
-        outputAudioContextRef.current = new ((window as any).AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-
-        const systemInstruction = `
----
-USER CONTEXT:
-Location: ${userProfile.location}
-Gender: ${userProfile.gender}
----
-${VOICE_PROMPT}
-        `.trim();
-
-        const sessionPromise = ai.live.connect({
-            model: 'gemini-2.5-flash-native-audio-preview-09-2025',
-            callbacks: {
-                onopen: () => {
-                    setVoiceConnectionStatus('connected');
-                    audioSourceNodeRef.current = inputAudioContextRef.current!.createMediaStreamSource(stream);
-                    audioProcessorNodeRef.current = inputAudioContextRef.current!.createScriptProcessor(4096, 1, 1);
-
-                    audioProcessorNodeRef.current.onaudioprocess = (audioProcessingEvent) => {
-                        const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
-
-                        // Calculate volume and update UI
-                        let sum = 0.0;
-                        for (let i = 0; i < inputData.length; i++) {
-                            sum += inputData[i] * inputData[i];
-                        }
-                        const rms = Math.sqrt(sum / inputData.length);
-                        
-                        if (animationFrameRef.current === null) {
-                            animationFrameRef.current = requestAnimationFrame(() => {
-                                setMicVolume(rms);
-                                animationFrameRef.current = null;
-                            });
-                        }
-
-                        const pcmBlob = createBlob(inputData);
-                        liveSessionRef.current?.then((session) => {
-                            session.sendRealtimeInput({ media: pcmBlob });
-                        });
-                    };
-
-                    audioSourceNodeRef.current.connect(audioProcessorNodeRef.current);
-                    audioProcessorNodeRef.current.connect(inputAudioContextRef.current!.destination);
-                },
-                onmessage: async (message: LiveServerMessage) => {
-                    if (message.serverContent?.outputTranscription) {
-                        setStreamingOutput(prev => prev + message.serverContent.outputTranscription.text);
-                    }
-                    if (message.serverContent?.inputTranscription) {
-                        setStreamingInput(prev => prev + message.serverContent.inputTranscription.text);
-                    }
-                    if (message.serverContent?.turnComplete) {
-                        const newMessages: Message[] = [];
-                        const finalInput = streamingInput.trim();
-                        const finalOutput = streamingOutput.trim();
-
-                        if (finalInput) {
-                            newMessages.push({ author: MessageAuthor.USER, text: finalInput });
-                        }
-                        if (finalOutput) {
-                            newMessages.push({ author: MessageAuthor.AI, text: finalOutput });
-                        }
-                        if (newMessages.length > 0) {
-                            setMessages(prev => [...prev, ...newMessages]);
-                        }
-                        setStreamingInput('');
-                        setStreamingOutput('');
-                    }
-
-                    const base64EncodedAudioString = message.serverContent?.modelTurn?.parts[0]?.inlineData.data;
-                    if (base64EncodedAudioString) {
-                        const outCtx = outputAudioContextRef.current!;
-                        nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outCtx.currentTime);
-                        const audioBuffer = await decodeAudioData(decode(base64EncodedAudioString), outCtx, 24000, 1);
-                        const source = outCtx.createBufferSource();
-                        source.buffer = audioBuffer;
-                        source.connect(outCtx.destination);
-                        source.addEventListener('ended', () => {
-                            outputSourcesRef.current.delete(source);
-                        });
-
-                        source.start(nextStartTimeRef.current);
-                        nextStartTimeRef.current = nextStartTimeRef.current + audioBuffer.duration;
-                        outputSourcesRef.current.add(source);
-                    }
-                },
-                onerror: (e: ErrorEvent) => {
-                    console.error('Voice chat error:', e);
-                    setError("Voice chat connection error. Please try again.");
-                    setVoiceConnectionStatus('error');
-                    stopVoiceChat();
-                },
-                onclose: (_e: CloseEvent) => {
-                    stopVoiceChat();
-                },
-            },
-            config: {
-                responseModalities: [Modality.AUDIO],
-                speechConfig: {
-                    voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
-                },
-                systemInstruction: systemInstruction,
-                inputAudioTranscription: {},
-                outputAudioTranscription: {},
-            },
-        });
-        liveSessionRef.current = sessionPromise;
-
-    } catch (err) {
-        console.error("Failed to start voice chat:", err);
-        setError("Could not access microphone. Please check permissions and try again.");
-        setVoiceConnectionStatus('error');
-    }
-  };
-
-  const stopVoiceChat = () => {
-    liveSessionRef.current?.then(session => session.close());
-    liveSessionRef.current = null;
-    
-    mediaStreamRef.current?.getTracks().forEach(track => track.stop());
-    mediaStreamRef.current = null;
-
-    audioSourceNodeRef.current?.disconnect();
-    audioProcessorNodeRef.current?.disconnect();
-    audioSourceNodeRef.current = null;
-    audioProcessorNodeRef.current = null;
-    
-    inputAudioContextRef.current?.close();
-    outputAudioContextRef.current?.close();
-    inputAudioContextRef.current = null;
-    outputAudioContextRef.current = null;
-    
-    outputSourcesRef.current.forEach(source => source.stop());
-    outputSourcesRef.current.clear();
-    nextStartTimeRef.current = 0;
-
-    if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-    }
-    setMicVolume(0);
-    setStreamingInput('');
-    setStreamingOutput('');
-
-    setVoiceConnectionStatus('idle');
-  };
-  
-  const handleToggleVoiceChat = () => {
-    if (voiceConnectionStatus === 'connected') {
-        stopVoiceChat();
-    } else if (voiceConnectionStatus === 'idle' || voiceConnectionStatus === 'error') {
-        startVoiceChat();
-    }
-    // Do nothing if 'connecting'
-  };
-
 
   const openCamera = async () => {
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -978,26 +721,6 @@ ${VOICE_PROMPT}
             )}
           </div>
         ))}
-        {streamingInput && (
-            <div className="flex items-start gap-3 justify-end">
-                <div className={`max-w-xl px-4 py-3 rounded-2xl bg-sky-600 text-white rounded-br-none`}>
-                    <div className="whitespace-pre-wrap">{streamingInput}</div>
-                </div>
-                <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full ${avatarUser}`}>
-                    <UserIcon />
-                </div>
-            </div>
-        )}
-        {streamingOutput && (
-            <div className="flex items-start gap-3 justify-start">
-                <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full ${avatarAI}`}>
-                    <BotIcon />
-                </div>
-                <div className={`max-w-xl px-4 py-3 rounded-2xl rounded-bl-none ${msgBubbleAI}`}>
-                    <div className="whitespace-pre-wrap">{streamingOutput}</div>
-                </div>
-            </div>
-        )}
                 {(isThinking || isWriting) && (
                     <div className="flex items-start gap-3 justify-start">
                         <div className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full ${avatarAI}`}>
@@ -1065,7 +788,7 @@ ${VOICE_PROMPT}
       )}
 
       <div className={`px-4 pt-3 pb-4 border-t backdrop-blur-sm ${dm ? 'bg-slate-800/90 border-slate-700/70' : 'bg-white/90 border-gray-200'}`}>
-         {quickReplies && !streamingInput && !streamingOutput && (
+         {quickReplies && (
             <div className="mb-2">
               {/* Toggle pill — always visible, collapsed by default */}
               <button
@@ -1224,19 +947,9 @@ ${VOICE_PROMPT}
                 }}
                 placeholder="Message Afterhour Resources..."
                 rows={1}
-                className={`w-full px-4 py-3 pr-24 text-sm transition-colors duration-150 border rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-sky-500/70 focus:border-sky-500/50 ${surfaceInput}`}
+                className={`w-full px-4 py-3 pr-14 text-sm transition-colors duration-150 border rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-sky-500/70 focus:border-sky-500/50 ${surfaceInput}`}
               />
               <div className="absolute inset-y-0 right-0 flex items-center pr-1">
-                <button
-                  onClick={handleToggleVoiceChat}
-                  disabled={!ai || voiceConnectionStatus === 'connecting'}
-                  title={voiceConnectionStatus === 'connected' ? 'Stop Voice Chat' : 'Start Voice Chat'}
-                  className="flex items-center justify-center w-10 h-10 text-slate-400 hover:text-sky-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div style={{ transform: `scale(${voiceConnectionStatus === 'connected' ? 1 + micVolume * 5 : 1})`, transition: 'transform 75ms linear' }}>
-                    <MicrophoneIcon className={`${voiceConnectionStatus === 'connected' ? 'text-red-500' : ''} ${voiceConnectionStatus === 'connecting' ? 'animate-pulse text-sky-500' : ''}`} />
-                  </div>
-                </button>
                 <button
                   onClick={handleSend}
                   disabled={(!input.trim() && !attachedImage) || isThinking}

@@ -1,4 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ChatScreen from './components/ChatScreen';
 import DisclaimerScreen from './components/DisclaimerScreen';
@@ -50,7 +49,6 @@ const App: React.FC = () => {
   const [showTutorial, setShowTutorial]             = useState(false);
 
   // ── Refs ─────────────────────────────────────────────────
-  const aiRef           = useRef<GoogleGenAI | null>(null);
   const managerChatRef  = useRef<ChatLike | null>(null);
   const infoChatRef     = useRef<ChatLike | null>(null);
   const locationChatRef = useRef<ChatLike | null>(null);
@@ -77,30 +75,18 @@ const App: React.FC = () => {
     setInitialPrompt(null);
   };
 
-  // ── Init AI ───────────────────────────────────────────────
-  useEffect(() => {
-    try {
-      const apiKey = process.env.API_KEY;
-      if (!apiKey) throw new Error('API_KEY not found');
-      aiRef.current = new GoogleGenAI({ apiKey });
-    } catch (e) {
-      console.error(e);
-      setError('Could not initialize the AI service. Please check your configuration.');
-    }
-  }, []);
-
-  // ── Prefer a local Ollama model over Gemini if one is running ─────────────
+  // ── Prefer a local Ollama model over Bedrock if one is running ────────────
   // Gated by VITE_ENABLE_LOCAL_MODEL rather than import.meta.env.DEV, so it
   // works in the deployed build too (only for whoever is running Ollama on
   // the machine loading the page — everyone else fails the reachability
-  // check below and silently uses Gemini, same as always).
+  // check below and silently uses Bedrock, same as always).
   // To retire this once there's a real cloud AI backend: set
   // VITE_ENABLE_LOCAL_MODEL=false (or delete the var) — no code change needed.
   useEffect(() => {
     if (import.meta.env.VITE_ENABLE_LOCAL_MODEL !== 'true') return;
     isOllamaAvailable().then(available => {
       useLocalModelRef.current = available;
-      if (available) console.info(`Local model detected — using Ollama (${OLLAMA_MODEL}) with Gemini fallback.`);
+      if (available) console.info(`Local model detected — using Ollama (${OLLAMA_MODEL}) with Bedrock fallback.`);
     });
   }, []);
 
@@ -287,7 +273,7 @@ const App: React.FC = () => {
       setIsWriting(false);
     } catch (e) {
       console.error(e);
-      setError('Could not initialize the AI assistant. Please check your API key and refresh the page.');
+      setError('Could not initialize the AI assistant. Please refresh the page and try again.');
     }
   }, [userProfile, hospitalData]);
 
@@ -372,7 +358,6 @@ const App: React.FC = () => {
       case 'chat':
         return (
           <ChatScreen
-            ai={aiRef.current}
             userProfile={userProfile}
             messages={messages}
             setMessages={setMessages}
