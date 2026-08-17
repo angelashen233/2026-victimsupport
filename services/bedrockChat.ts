@@ -29,11 +29,9 @@ async function chatCompletion(systemInstruction: string, history: Content[], mes
 }
 
 class BedrockChat implements ChatLike {
-  private history: Content[];
+  private history: Content[] = [];
 
-  constructor(private systemInstruction: string, seedHistory: Content[] = []) {
-    this.history = seedHistory;
-  }
+  constructor(private systemInstruction: string) {}
 
   async sendMessage({ message, ephemeralContext }: { message: Part[]; ephemeralContext?: string }): Promise<{ text: string }> {
     // Llama 3 8B Instruct is text-only — if a photo is attached, drop the
@@ -64,5 +62,5 @@ class BedrockChat implements ChatLike {
   }
 }
 
-export const createBedrockAgent = (systemInstruction: string, seedHistory: Content[] = []): ChatLike =>
-  new BedrockChat(systemInstruction, seedHistory);
+export const createBedrockAgent = (systemInstruction: string): ChatLike =>
+  new BedrockChat(systemInstruction);

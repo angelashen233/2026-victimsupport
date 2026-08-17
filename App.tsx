@@ -9,9 +9,8 @@ import TutorialOverlay from './components/TutorialOverlay';
 import WaitTimeMenu from './components/WaitTimeMenu';
 import { initialUserProfile } from './data/userProfile';
 import type { ChatLike } from './services/agents';
-import { buildSystemInstruction, createAgent, createAgentWithHistory, INFO_PROMPT, LOCATION_PROMPT, MANAGER_PROMPT, OFFTOPIC_PROMPT } from './services/agents';
+import { createAgent, INFO_PROMPT, LOCATION_PROMPT, MANAGER_PROMPT, OFFTOPIC_PROMPT } from './services/agents';
 import { generateReport, generateResources } from './services/reportService';
-import { createHybridAgent, isOllamaAvailable, OLLAMA_MODEL } from './services/ollamaChat';
 import type { Message, Recipient, ReportData, Resource, UserProfile } from './types';
 import { MessageAuthor } from './types';
 
@@ -53,8 +52,6 @@ const App: React.FC = () => {
   const infoChatRef     = useRef<ChatLike | null>(null);
   const locationChatRef = useRef<ChatLike | null>(null);
   const offTopicChatRef = useRef<ChatLike | null>(null);
-  // Dev-only: true once we've confirmed a local Ollama server is reachable.
-  const useLocalModelRef = useRef(false);
 
   // ── Reset ─────────────────────────────────────────────────
   const handleStartOver = () => {
@@ -74,21 +71,6 @@ const App: React.FC = () => {
     setShowMap(false);
     setInitialPrompt(null);
   };
-
-  // ── Prefer a local Ollama model over Bedrock if one is running ────────────
-  // Gated by VITE_ENABLE_LOCAL_MODEL rather than import.meta.env.DEV, so it
-  // works in the deployed build too (only for whoever is running Ollama on
-  // the machine loading the page — everyone else fails the reachability
-  // check below and silently uses Bedrock, same as always).
-  // To retire this once there's a real cloud AI backend: set
-  // VITE_ENABLE_LOCAL_MODEL=false (or delete the var) — no code change needed.
-  useEffect(() => {
-    if (import.meta.env.VITE_ENABLE_LOCAL_MODEL !== 'true') return;
-    isOllamaAvailable().then(available => {
-      useLocalModelRef.current = available;
-      if (available) console.info(`Local model detected — using Ollama (${OLLAMA_MODEL}) with Bedrock fallback.`);
-    });
-  }, []);
 
   // ── Fetch hospital data + resources ───────────────────────
   useEffect(() => {
@@ -248,20 +230,10 @@ const App: React.FC = () => {
       // the AI's hospital/resource data current through the whole session.
       const userProfileWithHospitals = { ...userProfile, hospitalData };
 
-      // Dev-only: route through the local Ollama model, falling back to Bedrock
-      // mid-session if it's unavailable or errors. See services/ollamaChat.ts.
-      const makeAgent = (basePrompt: string): ChatLike => {
-        if (!useLocalModelRef.current) return createAgent(basePrompt, userProfileWithHospitals);
-        return createHybridAgent(
-          buildSystemInstruction(basePrompt, userProfileWithHospitals),
-          history => createAgentWithHistory(basePrompt, userProfileWithHospitals, history),
-        );
-      };
-
-      managerChatRef.current  = makeAgent(MANAGER_PROMPT);
-      infoChatRef.current     = makeAgent(INFO_PROMPT);
-      locationChatRef.current = makeAgent(LOCATION_PROMPT);
-      offTopicChatRef.current = makeAgent(OFFTOPIC_PROMPT);
+      managerChatRef.current  = createAgent(MANAGER_PROMPT, userProfileWithHospitals);
+      infoChatRef.current     = createAgent(INFO_PROMPT, userProfileWithHospitals);
+      locationChatRef.current = createAgent(LOCATION_PROMPT, userProfileWithHospitals);
+      offTopicChatRef.current = createAgent(OFFTOPIC_PROMPT, userProfileWithHospitals);
 
       setMessages([{
         author: MessageAuthor.AI,

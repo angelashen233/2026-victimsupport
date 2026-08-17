@@ -1,10 +1,9 @@
-import type { Content, Part } from "./parts";
+import type { Part } from "./parts";
 import type { UserProfile } from "../types";
 import { createBedrockAgent } from "./bedrockChat";
 
-// Minimal structural interface both the Bedrock-backed chat (services/bedrockChat.ts)
-// and the local-model fallback wrapper (services/ollamaChat.ts) satisfy, so callers
-// don't need to know which one they got.
+// Minimal structural interface the Bedrock-backed chat (services/bedrockChat.ts)
+// satisfies, so callers depend on this shape rather than the concrete class.
 export interface ChatLike {
   // `ephemeralContext` carries state that must be visible to the model THIS
   // turn (live hospital/resource data, current timestamp) but must never be
@@ -480,18 +479,4 @@ Gender: ${userProfile.gender}
 export const createAgent = (basePrompt: string, userProfile: UserProfile): ChatLike => {
   const systemInstruction = buildSystemInstruction(basePrompt, userProfile);
   return createBedrockAgent(systemInstruction);
-};
-
-/**
- * Same as createAgent, but seeds the chat with prior conversation turns.
- * Used when the local-model fallback (services/ollamaChat.ts) has to hand a
- * mid-conversation session over to Bedrock and needs it to have the context.
- */
-export const createAgentWithHistory = (
-  basePrompt: string,
-  userProfile: UserProfile,
-  history: Content[],
-): ChatLike => {
-  const systemInstruction = buildSystemInstruction(basePrompt, userProfile);
-  return createBedrockAgent(systemInstruction, history);
 };
